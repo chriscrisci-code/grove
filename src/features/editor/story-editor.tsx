@@ -4,8 +4,55 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Bold, Heading2, Italic, List, ListOrdered, Quote } from "lucide-react";
-import { useEffect } from "react";
+import {
+  Bold,
+  Heading2,
+  Italic,
+  List,
+  ListOrdered,
+  Mic,
+  MicOff,
+  Quote,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+type SpeechResult = {
+  isFinal: boolean;
+  0: { transcript: string };
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: SpeechResult;
+  };
+};
+
+type SpeechRecognitionErrorLike = {
+  error: string;
+};
+
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 type StoryEditorProps = {
   content: string;
@@ -20,10 +67,14 @@ export function StoryEditor({
   onCreatePage,
   onOpenAi,
 }: StoryEditorProps) {
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [dictationStatus, setDictationStatus] = useState("");
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({ link: false }),
       Link.configure({
         openOnClick: false,
         HTMLAttributes: { class: "story-link" },
@@ -41,6 +92,15 @@ export function StoryEditor({
     },
     onUpdate: ({ editor: currentEditor }) => onChange(currentEditor.getHTML()),
   });
+
+  useEffect(() => {
+    queueMicrotask(() =>
+      setSpeechSupported(
+        Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
+      ),
+    );
+    return () => recognitionRef.current?.abort();
+  }, []);
   const formatState = useEditorState({
     editor,
     selector: ({ editor: currentEditor }) => ({
@@ -90,6 +150,77 @@ export function StoryEditor({
   }, [editor, onCreatePage, onOpenAi]);
 
   if (!editor) return <div className="editor-loading">Opening your page…</div>;
+  const dictationEditor = editor;
+
+  function toggleDictation() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      setDictationStatus("Finishing dictation…");
+      return;
+    }
+    const Recognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setDictationStatus(
+        "Voice typing is not supported by this browser. Try Chrome or Edge.",
+      );
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+    recognition.onresult = (event) => {
+      let finalText = "";
+      let interimText = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        if (result.isFinal) finalText += result[0].transcript;
+        else interimText += result[0].transcript;
+      }
+      if (finalText.trim()) {
+        dictationEditor
+          .chain()
+          .focus()
+          .insertContent(`${finalText.trim()} `)
+          .run();
+      }
+      setDictationStatus(
+        interimText.trim()
+          ? `Listening: ${interimText.trim()}`
+          : "Listening… speak naturally.",
+      );
+    };
+    recognition.onerror = (event) => {
+      setListening(false);
+      setDictationStatus(
+        event.error === "not-allowed"
+          ? "Microphone access was blocked. Allow it in your browser settings."
+          : "Dictation stopped. Tap the microphone to try again.",
+      );
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+      setDictationStatus((current) =>
+        current.startsWith("Microphone") || current.startsWith("Dictation")
+          ? current
+          : "Dictation stopped.",
+      );
+    };
+
+    recognitionRef.current = recognition;
+    try {
+      dictationEditor.chain().focus().run();
+      recognition.start();
+      setListening(true);
+      setDictationStatus("Listening… speak naturally.");
+    } catch {
+      setListening(false);
+      setDictationStatus("The microphone could not be started.");
+    }
+  }
 
   const tools = [
     {
@@ -147,7 +278,41 @@ export function StoryEditor({
             <Icon size={16} />
           </button>
         ))}
+        <span className="toolbar-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className={`dictation-button ${listening ? "listening" : ""}`}
+          title={
+            speechSupported
+              ? listening
+                ? "Stop dictation"
+                : "Start voice typing"
+              : "Voice typing is unavailable in this browser"
+          }
+          aria-label={listening ? "Stop dictation" : "Start voice typing"}
+          aria-pressed={listening}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={toggleDictation}
+        >
+          {listening ? <MicOff size={16} /> : <Mic size={16} />}
+          <span>{listening ? "Stop" : "Dictate"}</span>
+        </button>
       </div>
+      {dictationStatus && (
+        <div
+          className={`dictation-status ${listening ? "listening" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          {listening && <span className="dictation-pulse" />}
+          {dictationStatus}
+          {!listening && (
+            <button type="button" onClick={() => setDictationStatus("")}>
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
       <EditorContent editor={editor} />
     </div>
   );

@@ -1,9 +1,11 @@
-# StoryTree
+# Grove
 
-StoryTree is a connected writing space for drafting stories and maintaining a
+Grove is a connected writing space for drafting stories and maintaining a
 world bible. The current vertical slice includes:
 
 - A rich-text editor with local autosave
+- A responsive project dashboard for separate books and worlds
+- Private 2:3 book-cover thumbnails backed by Supabase Storage
 - Hierarchical pages and child-page creation
 - `Alt+P` to turn the word before the caret into a linked child page
 - `Alt+A` to open the AI writing panel with the current selection
@@ -18,9 +20,8 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. The editor works immediately and stores draft
-pages in this browser. API keys remain in memory and are cleared when the tab
-closes.
+Open <http://localhost:3000>. With Supabase configured, sign in to reach the
+project dashboard and open a project-specific writing workspace.
 
 ## Connect Supabase
 
@@ -30,23 +31,37 @@ Supabase is not required for the local vertical slice. When ready:
 2. Copy `.env.example` to `.env.local`.
 3. Add the project URL and publishable key from **Project Settings > API**.
 4. Generate `AI_KEY_ENCRYPTION_SECRET` with `openssl rand -base64 32`.
-5. Run `supabase/migrations/001_initial_schema.sql` in the Supabase SQL editor,
-   or link the Supabase CLI and run `supabase db push`.
+5. Apply the SQL files in `supabase/migrations` in numeric order, or link the
+   Supabase CLI and run `supabase db push`. Migration `006` creates the private
+   `workspace-covers` bucket and project-creation function.
 
 Do not expose the database password, service-role key, or encryption secret in
 the browser. The migration enables row-level security and provisions one
 workspace and starter page for each new account.
 
+## Research search
+
+In-app research search uses Tavily. Add a server-side `TAVILY_API_KEY` to
+`.env.local`; never expose it with a `NEXT_PUBLIC_` prefix.
+
+## Cover uploads
+
+Project owners can upload JPEG, PNG, or WebP covers up to 5 MB from the
+dashboard. Grove stores the original image in the private
+`workspace-covers` bucket and displays it in a consistent 2:3 frame without
+stretching the source image.
+
 ## AI behavior
 
-The local AI panel sends the selected provider key directly to this app's
-server endpoint over the current connection and does not persist it. Before
-deployment, use HTTPS. The cloud phase will move key writes to authenticated
-server routes and store only AES-GCM ciphertext in `ai_settings`.
+In cloud mode, provider keys are encrypted server-side with AES-256-GCM and
+stored as ciphertext in `ai_settings`. Decrypted keys remain server-only and
+are used solely for the authenticated user's AI request. Use HTTPS in every
+deployed environment.
 
 ## Verification
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```

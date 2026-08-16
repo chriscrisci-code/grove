@@ -28,7 +28,7 @@ create table public.pages (
   position double precision not null default 0,
   version integer not null default 1,
   deleted_at timestamptz,
-  created_by uuid not null references auth.users(id),
+  created_by uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint page_cannot_parent_itself check (parent_id is null or parent_id <> id)
@@ -91,7 +91,7 @@ begin
   values (new_workspace_id, new.id, 'owner');
 
   insert into public.pages (workspace_id, title, created_by)
-  values (new_workspace_id, 'Welcome to StoryTree', new.id);
+  values (new_workspace_id, 'Welcome to Grove', new.id);
 
   return new;
 end;

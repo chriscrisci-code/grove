@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const result = streamText({
       model: languageModel,
       system:
-        "You are StoryTree, a thoughtful writing partner. Help the writer develop their own intent. Be concise, concrete, and preserve the writer's voice. Never claim to have edited the document.",
+        "You are Grove, a thoughtful writing partner. Help the writer develop their own intent. Be concise, concrete, and preserve the writer's voice. Never claim to have edited the document.",
       prompt: context
         ? `Relevant passage:\n${context}\n\nWriter's request:\n${prompt}`
         : prompt,

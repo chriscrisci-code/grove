@@ -1,13 +1,15 @@
 "use client";
 
 import {
+  ArrowLeft,
   BookOpen,
   BrainCircuit,
   ChevronDown,
   ChevronRight,
   FileText,
+  LibraryBig,
   LogOut,
-  MoreHorizontal,
+  Menu,
   PanelLeftClose,
   Plus,
   Search,
@@ -17,8 +19,17 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { StoryEditor } from "@/features/editor/story-editor";
+import { ResearchView } from "@/features/research/research-view";
 import { createClient } from "@/lib/supabase/client";
 
 export type StoryPage = {
@@ -35,9 +46,9 @@ const initialPages: StoryPage[] = [
   {
     id: "welcome",
     parentId: null,
-    title: "Welcome to StoryTree",
+    title: "Welcome to Grove",
     content:
-      "<p>Your story begins here. StoryTree keeps every character, place, and idea within reach.</p><h2>Try a quick link</h2><p>Type a name like <strong>Evermere</strong>, place your cursor after it, and press <strong>Alt+P</strong>. A linked child page will appear instantly.</p><p>Press <strong>Alt+A</strong> whenever you want to think alongside AI.</p>",
+      "<p>Your story begins here. Grove keeps every character, place, and idea within reach.</p><h2>Try a quick link</h2><p>Type a name like <strong>Evermere</strong>, place your cursor after it, and press <strong>Alt+P</strong>. A linked child page will appear instantly.</p><p>Press <strong>Alt+A</strong> whenever you want to think alongside AI.</p>",
     updatedAt: Date.now(),
   },
   {
@@ -71,6 +82,7 @@ function makeId() {
 type WorkspaceProps = {
   initialCloudPages?: StoryPage[];
   workspaceId?: string;
+  workspaceName?: string;
   userId?: string;
   userEmail?: string;
 };
@@ -78,6 +90,7 @@ type WorkspaceProps = {
 export function Workspace({
   initialCloudPages,
   workspaceId,
+  workspaceName = "My Story",
   userId,
   userEmail,
 }: WorkspaceProps = {}) {
@@ -91,7 +104,10 @@ export function Workspace({
     new Set(["characters"]),
   );
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(274);
+  const [isNarrow, setIsNarrow] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [researchOpen, setResearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selection, setSelection] = useState("");
   const [notice, setNotice] = useState("");
@@ -102,6 +118,34 @@ export function Workspace({
   const [apiKey, setApiKey] = useState("");
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const deletingIds = useRef(new Set<string>());
+  const sidebarWidthRef = useRef(274);
+
+  useEffect(() => {
+    const stored = Number(localStorage.getItem("grove-sidebar-width"));
+    if (Number.isFinite(stored) && stored >= 64 && stored <= 274) {
+      queueMicrotask(() => {
+        sidebarWidthRef.current = stored;
+        setSidebarWidth(stored);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      setIsNarrow(media.matches);
+      if (media.matches) {
+        setSidebarOpen(false);
+        setAiOpen(false);
+      }
+    };
+    queueMicrotask(() => {
+      setIsNarrow(media.matches);
+      if (media.matches) setSidebarOpen(false);
+    });
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     if (cloudMode) return;
@@ -189,6 +233,7 @@ export function Workspace({
       ) {
         event.preventDefault();
         setAiOpen(true);
+        setSidebarOpen(false);
       }
     }
     window.addEventListener("keydown", openAi);
@@ -321,19 +366,61 @@ export function Workspace({
   const openAi = useCallback((selectedText = "") => {
     setSelection(selectedText);
     setAiOpen(true);
+    setSidebarOpen(false);
   }, []);
 
+  function setDesktopSidebarWidth(width: number) {
+    const next = Math.min(274, Math.max(64, width));
+    sidebarWidthRef.current = next;
+    setSidebarWidth(next);
+  }
+
+  function startSidebarResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (isNarrow) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = sidebarWidthRef.current;
+    document.body.classList.add("resizing-sidebar");
+
+    const move = (moveEvent: PointerEvent) => {
+      setDesktopSidebarWidth(startWidth + moveEvent.clientX - startX);
+    };
+    const stop = () => {
+      document.body.classList.remove("resizing-sidebar");
+      localStorage.setItem(
+        "grove-sidebar-width",
+        String(sidebarWidthRef.current),
+      );
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  }
+
   if (!activePage) return null;
+  const sidebarMode =
+    sidebarWidth < 112 ? "rail" : sidebarWidth < 190 ? "compact" : "full";
+  const sidebarIndent = 3 + ((sidebarWidth - 64) / (274 - 64)) * 14;
 
   return (
     <main className="workspace-shell">
       {sidebarOpen && (
-        <aside className="sidebar">
+        <aside
+          className={`sidebar sidebar-${sidebarMode}`}
+          style={
+            {
+              width: sidebarWidth,
+              flexBasis: sidebarWidth,
+              "--sidebar-indent": `${sidebarIndent}px`,
+            } as CSSProperties
+          }
+        >
           <div className="brand">
             <span className="brand-mark">
               <BookOpen size={18} />
             </span>
-            <span>StoryTree</span>
+            <span className="brand-name">Grove</span>
             <button
               type="button"
               className="icon-button sidebar-close"
@@ -374,7 +461,10 @@ export function Workspace({
               parentId={null}
               activeId={activeId}
               expanded={expanded}
-              onSelect={setActiveId}
+              onSelect={(id) => {
+                setActiveId(id);
+                if (isNarrow) setSidebarOpen(false);
+              }}
               onToggle={(id) =>
                 setExpanded((current) => {
                   const next = new Set(current);
@@ -389,9 +479,15 @@ export function Workspace({
           </nav>
 
           <div className="sidebar-footer">
-            <button type="button" onClick={() => setSettingsOpen(true)}>
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsOpen(true);
+                if (isNarrow) setSidebarOpen(false);
+              }}
+            >
               <Settings size={16} />
-              Settings
+              <span>Settings</span>
             </button>
             {cloudMode ? (
               <button
@@ -413,7 +509,55 @@ export function Workspace({
               <div className="user-avatar">C</div>
             )}
           </div>
+          <div
+            className="sidebar-resizer"
+            role="separator"
+            aria-label="Resize page sidebar"
+            aria-orientation="vertical"
+            aria-valuemin={64}
+            aria-valuemax={274}
+            aria-valuenow={sidebarWidth}
+            tabIndex={0}
+            onPointerDown={startSidebarResize}
+            onDoubleClick={() => {
+              setDesktopSidebarWidth(274);
+              localStorage.setItem("grove-sidebar-width", "274");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                setDesktopSidebarWidth(sidebarWidth - 12);
+              } else if (event.key === "ArrowRight") {
+                event.preventDefault();
+                setDesktopSidebarWidth(sidebarWidth + 12);
+              } else if (event.key === "Home") {
+                event.preventDefault();
+                setDesktopSidebarWidth(64);
+              } else if (event.key === "End") {
+                event.preventDefault();
+                setDesktopSidebarWidth(274);
+              } else {
+                return;
+              }
+              localStorage.setItem(
+                "grove-sidebar-width",
+                String(sidebarWidthRef.current),
+              );
+            }}
+          />
         </aside>
+      )}
+
+      {isNarrow && (sidebarOpen || aiOpen) && (
+        <button
+          type="button"
+          className="workspace-backdrop"
+          aria-label="Close open panel"
+          onClick={() => {
+            setSidebarOpen(false);
+            setAiOpen(false);
+          }}
+        />
       )}
 
       <section className="document-pane">
@@ -423,57 +567,101 @@ export function Workspace({
               <button
                 type="button"
                 className="icon-button"
-                onClick={() => setSidebarOpen(true)}
+                onClick={() => {
+                  setSidebarOpen(true);
+                  setAiOpen(false);
+                }}
                 aria-label="Open sidebar"
               >
-                <BookOpen size={18} />
+                <Menu size={19} />
               </button>
             )}
-            <span>My Story</span>
+            <button
+              type="button"
+              className="dashboard-return"
+              onClick={() => router.push("/")}
+            >
+              <ArrowLeft size={14} />
+              <span>Projects</span>
+            </button>
             <ChevronRight size={14} />
+            <span className="workspace-name">{workspaceName}</span>
+            <ChevronRight size={14} className="desktop-crumb" />
             <strong>{activePage.title}</strong>
+            {researchOpen && (
+              <>
+                <ChevronRight size={14} />
+                <strong>Research</strong>
+              </>
+            )}
           </div>
           <div className="topbar-actions">
-            <span className="save-state">
-              {savedAt ? "Saved" : "Saving…"}
-            </span>
+            {!researchOpen && (
+              <span className="save-state">
+                {savedAt ? "Saved" : "Saving…"}
+              </span>
+            )}
+            <button
+              type="button"
+              className={`research-button ${researchOpen ? "active" : ""}`}
+              onClick={() => {
+                setResearchOpen((current) => !current);
+                setAiOpen(false);
+                setSidebarOpen(false);
+              }}
+            >
+              <LibraryBig size={15} />
+              <span>{researchOpen ? "Writing" : "Research"}</span>
+            </button>
+            {!researchOpen && (
+              <>
             <button
               type="button"
               className="ai-button"
               onClick={() => openAi()}
             >
               <Sparkles size={15} />
-              Ask AI
+              <span>Ask AI</span>
               <kbd>Alt A</kbd>
             </button>
-            <button type="button" className="icon-button" aria-label="More">
-              <MoreHorizontal size={18} />
-            </button>
+              </>
+            )}
           </div>
         </header>
 
-        <article className="document">
-          <div className="document-meta">
-            <span>PAGE</span>
-            <span>•</span>
-            <span>Edited just now</span>
-          </div>
-          <input
-            className="document-title"
-            value={activePage.title}
-            onChange={(event) =>
-              updateActivePage({ title: event.target.value })
-            }
-            aria-label="Page title"
-          />
-          <StoryEditor
+        {researchOpen ? (
+          <ResearchView
             key={activePage.id}
-            content={activePage.content}
-            onChange={(content) => updateActivePage({ content })}
-            onCreatePage={createLinkedPage}
-            onOpenAi={openAi}
+            pageId={activePage.id}
+            pageTitle={activePage.title}
+            cloudMode={cloudMode}
+            userId={userId}
+            onClose={() => setResearchOpen(false)}
           />
-        </article>
+        ) : (
+          <article className="document">
+            <div className="document-meta">
+              <span>PAGE</span>
+              <span>•</span>
+              <span>Edited just now</span>
+            </div>
+            <input
+              className="document-title"
+              value={activePage.title}
+              onChange={(event) =>
+                updateActivePage({ title: event.target.value })
+              }
+              aria-label="Page title"
+            />
+            <StoryEditor
+              key={activePage.id}
+              content={activePage.content}
+              onChange={(content) => updateActivePage({ content })}
+              onCreatePage={createLinkedPage}
+              onOpenAi={openAi}
+            />
+          </article>
+        )}
       </section>
 
       {aiOpen && (
@@ -494,6 +682,22 @@ export function Workspace({
           model={model}
           apiKey={apiKey}
           secureStorage={cloudMode}
+          onSetPassword={
+            cloudMode
+              ? async (password) => {
+                  const { error } = await createClient().auth.updateUser({
+                    password,
+                  });
+                  setNotice(
+                    error
+                      ? error.message
+                      : "Password saved. You can use it next time you sign in.",
+                  );
+                  window.setTimeout(() => setNotice(""), 3200);
+                  return !error;
+                }
+              : undefined
+          }
           onClose={() => setSettingsOpen(false)}
           onSave={async (nextProvider, nextModel, nextKey) => {
             if (cloudMode) {
@@ -579,6 +783,8 @@ function PageBranch({
             <button
               type="button"
               className="page-name"
+              data-initial={(page.title || "Untitled").charAt(0).toUpperCase()}
+              title={page.title || "Untitled"}
               onClick={() => onSelect(page.id)}
             >
               <FileText size={15} />
@@ -689,7 +895,7 @@ function AiPanel({
             <BrainCircuit size={18} />
           </span>
           <div>
-            <strong>StoryTree AI</strong>
+            <strong>Grove AI</strong>
             <small>
               {provider} · {model}
             </small>
@@ -772,6 +978,7 @@ function SettingsDialog({
   model,
   apiKey,
   secureStorage,
+  onSetPassword,
   onClose,
   onSave,
 }: {
@@ -779,12 +986,15 @@ function SettingsDialog({
   model: string;
   apiKey: string;
   secureStorage: boolean;
+  onSetPassword?: (password: string) => Promise<boolean>;
   onClose: () => void;
   onSave: (provider: AiProvider, model: string, apiKey: string) => void;
 }) {
   const [nextProvider, setNextProvider] = useState(provider);
   const [nextModel, setNextModel] = useState(model);
   const [nextKey, setNextKey] = useState(apiKey);
+  const [newPassword, setNewPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
   const models: Record<AiProvider, string[]> = {
     openai: ["gpt-5-mini", "gpt-5.2", "gpt-4.1"],
     anthropic: ["claude-sonnet-4-6", "claude-opus-4-6"],
@@ -802,7 +1012,7 @@ function SettingsDialog({
         <header>
           <div>
             <span className="eyebrow">SETTINGS</span>
-            <h2 id="settings-title">AI connection</h2>
+            <h2 id="settings-title">Settings</h2>
           </div>
           <button
             type="button"
@@ -814,6 +1024,45 @@ function SettingsDialog({
           </button>
         </header>
         <div className="settings-content">
+          {onSetPassword && (
+            <section className="settings-section">
+              <div>
+                <h3>Account password</h3>
+                <p>
+                  Set a password now so you can sign in without an email link.
+                </p>
+              </div>
+              <label>
+                New password
+                <input
+                  type="password"
+                  minLength={8}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                />
+              </label>
+              <button
+                type="button"
+                className="inline-save-button"
+                disabled={newPassword.length < 8 || savingPassword}
+                onClick={async () => {
+                  setSavingPassword(true);
+                  const saved = await onSetPassword(newPassword);
+                  setSavingPassword(false);
+                  if (saved) setNewPassword("");
+                }}
+              >
+                {savingPassword ? "Saving…" : "Set password"}
+              </button>
+            </section>
+          )}
+          <section className="settings-section">
+            <div>
+              <h3>AI connection</h3>
+              <p>Use your preferred provider and model inside Grove.</p>
+            </div>
           <label>
             Provider
             <select
@@ -861,6 +1110,7 @@ function SettingsDialog({
               ? "Your key is encrypted before database storage and is never returned to this browser."
               : "Your key stays in memory and disappears when the tab closes."}
           </p>
+          </section>
         </div>
         <footer>
           <button type="button" className="secondary-button" onClick={onClose}>

@@ -2,7 +2,7 @@
 
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, Heading2, Italic, List, ListOrdered, Quote } from "lucide-react";
 import { useEffect } from "react";
@@ -40,6 +40,17 @@ export function StoryEditor({
       },
     },
     onUpdate: ({ editor: currentEditor }) => onChange(currentEditor.getHTML()),
+  });
+  const formatState = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => ({
+      bold: currentEditor?.isActive("bold") ?? false,
+      italic: currentEditor?.isActive("italic") ?? false,
+      heading: currentEditor?.isActive("heading", { level: 2 }) ?? false,
+      bulletList: currentEditor?.isActive("bulletList") ?? false,
+      orderedList: currentEditor?.isActive("orderedList") ?? false,
+      blockquote: currentEditor?.isActive("blockquote") ?? false,
+    }),
   });
 
   useEffect(() => {
@@ -84,37 +95,37 @@ export function StoryEditor({
     {
       label: "Bold",
       icon: Bold,
-      active: editor.isActive("bold"),
+      active: formatState?.bold ?? false,
       run: () => editor.chain().focus().toggleBold().run(),
     },
     {
       label: "Italic",
       icon: Italic,
-      active: editor.isActive("italic"),
+      active: formatState?.italic ?? false,
       run: () => editor.chain().focus().toggleItalic().run(),
     },
     {
       label: "Heading",
       icon: Heading2,
-      active: editor.isActive("heading", { level: 2 }),
+      active: formatState?.heading ?? false,
       run: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
     },
     {
       label: "Bulleted list",
       icon: List,
-      active: editor.isActive("bulletList"),
+      active: formatState?.bulletList ?? false,
       run: () => editor.chain().focus().toggleBulletList().run(),
     },
     {
       label: "Numbered list",
       icon: ListOrdered,
-      active: editor.isActive("orderedList"),
+      active: formatState?.orderedList ?? false,
       run: () => editor.chain().focus().toggleOrderedList().run(),
     },
     {
       label: "Quote",
       icon: Quote,
-      active: editor.isActive("blockquote"),
+      active: formatState?.blockquote ?? false,
       run: () => editor.chain().focus().toggleBlockquote().run(),
     },
   ];
@@ -130,6 +141,7 @@ export function StoryEditor({
             aria-label={label}
             aria-pressed={active}
             className={active ? "active" : ""}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={run}
           >
             <Icon size={16} />

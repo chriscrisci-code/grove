@@ -1,5 +1,9 @@
 import { AuthScreen } from "@/features/auth/auth-screen";
-import { Workspace, type StoryPage } from "@/features/workspace/workspace";
+import {
+  Dashboard,
+  type DashboardProject,
+} from "@/features/dashboard/dashboard";
+import { Workspace } from "@/features/workspace/workspace";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Home() {
@@ -16,43 +20,30 @@ export default async function Home() {
   } = await supabase.auth.getUser();
   if (!user) return <AuthScreen />;
 
-  const { data: workspace } = await supabase
+  const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("id")
-    .limit(1)
-    .single();
+    .select("id,name,description,genre,cover_path,updated_at")
+    .order("updated_at", { ascending: false });
 
-  if (!workspace) {
-    return <AuthScreen />;
-  }
-
-  const { data: rows } = await supabase
-    .from("pages")
-    .select("id,parent_id,title,content,updated_at")
-    .eq("workspace_id", workspace.id)
-    .is("deleted_at", null)
-    .order("position");
-
-  const pages: StoryPage[] = (rows ?? []).map((page) => {
-    const content = page.content as { html?: string } | string | null;
-    return {
-      id: page.id,
-      parentId: page.parent_id,
-      title: page.title,
-      content:
-        typeof content === "string"
-          ? content
-          : content?.html || "<p>Begin writing your story…</p>",
-      updatedAt: new Date(page.updated_at).getTime(),
-    };
-  });
-
-  return (
-    <Workspace
-      initialCloudPages={pages}
-      workspaceId={workspace.id}
-      userId={user.id}
-      userEmail={user.email}
-    />
+  const projects: DashboardProject[] = await Promise.all(
+    (workspaces ?? []).map(async (workspace) => {
+      let coverUrl: string | null = null;
+      if (workspace.cover_path) {
+        const { data } = await supabase.storage
+          .from("workspace-covers")
+          .createSignedUrl(workspace.cover_path, 3600);
+        coverUrl = data?.signedUrl ?? null;
+      }
+      return {
+        id: workspace.id,
+        name: workspace.name,
+        description: workspace.description,
+        genre: workspace.genre,
+        coverUrl,
+        updatedAt: workspace.updated_at,
+      };
+    }),
   );
+
+  return <Dashboard initialProjects={projects} userEmail={user.email} />;
 }

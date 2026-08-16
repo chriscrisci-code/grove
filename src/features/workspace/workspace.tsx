@@ -6,18 +6,22 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  LogOut,
   MoreHorizontal,
   PanelLeftClose,
   Plus,
   Search,
   Settings,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StoryEditor } from "@/features/editor/story-editor";
+import { createClient } from "@/lib/supabase/client";
 
-type StoryPage = {
+export type StoryPage = {
   id: string;
   parentId: string | null;
   title: string;
@@ -64,9 +68,25 @@ function makeId() {
   return crypto.randomUUID();
 }
 
-export function Workspace() {
-  const [pages, setPages] = useState(initialPages);
-  const [activeId, setActiveId] = useState("welcome");
+type WorkspaceProps = {
+  initialCloudPages?: StoryPage[];
+  workspaceId?: string;
+  userId?: string;
+  userEmail?: string;
+};
+
+export function Workspace({
+  initialCloudPages,
+  workspaceId,
+  userId,
+  userEmail,
+}: WorkspaceProps = {}) {
+  const router = useRouter();
+  const cloudMode = Boolean(workspaceId && userId);
+  const startingPages =
+    initialCloudPages?.length ? initialCloudPages : initialPages;
+  const [pages, setPages] = useState(startingPages);
+  const [activeId, setActiveId] = useState(startingPages[0]?.id ?? "welcome");
   const [expanded, setExpanded] = useState<Set<string>>(
     new Set(["characters"]),
   );
@@ -80,8 +100,11 @@ export function Workspace() {
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [model, setModel] = useState("gpt-5-mini");
   const [apiKey, setApiKey] = useState("");
+  const [hasStoredKey, setHasStoredKey] = useState(false);
+  const deletingIds = useRef(new Set<string>());
 
   useEffect(() => {
+    if (cloudMode) return;
     const raw = localStorage.getItem("storytree-pages");
     const storedActiveId = localStorage.getItem("storytree-active-page");
     const storedProvider = localStorage.getItem("storytree-ai-provider");
@@ -105,16 +128,56 @@ export function Workspace() {
       }
       if (storedModel) setModel(storedModel);
     });
-  }, []);
+  }, [cloudMode]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      localStorage.setItem("storytree-pages", JSON.stringify(pages));
-      localStorage.setItem("storytree-active-page", activeId);
+    if (!cloudMode) return;
+    fetch("/api/ai/settings")
+      .then((response) => response.json())
+      .then(
+        (settings: {
+          provider?: AiProvider;
+          model?: string;
+          hasKey?: boolean;
+        }) => {
+          if (settings.provider) setProvider(settings.provider);
+          if (settings.model) setModel(settings.model);
+          setHasStoredKey(Boolean(settings.hasKey));
+        },
+      )
+      .catch(() => setHasStoredKey(false));
+  }, [cloudMode]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      if (cloudMode && workspaceId && userId) {
+        const supabase = createClient();
+        const { error } = await supabase.from("pages").upsert(
+          pages
+            .filter((page) => !deletingIds.current.has(page.id))
+            .map((page, position) => ({
+              id: page.id,
+              workspace_id: workspaceId,
+              parent_id: page.parentId,
+              title: page.title || "Untitled",
+              content: { html: page.content },
+              position,
+              created_by: userId,
+            })),
+          { onConflict: "id" },
+        );
+        if (error) {
+          setNotice("Cloud save failed. Your text is still on screen.");
+          return;
+        }
+      } else {
+        localStorage.setItem("storytree-pages", JSON.stringify(pages));
+        localStorage.setItem("storytree-active-page", activeId);
+      }
       setSavedAt(Date.now());
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [pages, activeId]);
+  }, [pages, activeId, cloudMode, userId, workspaceId]);
 
   useEffect(() => {
     function openAi(event: KeyboardEvent) {
@@ -187,6 +250,74 @@ export function Workspace() {
     [activeId],
   );
 
+  const deletePage = useCallback(
+    async (id: string) => {
+      const target = pages.find((page) => page.id === id);
+      if (!target) return;
+      const confirmed = window.confirm(
+        `Delete “${target.title || "Untitled"}” and all pages inside it?`,
+      );
+      if (!confirmed) return;
+
+      const deletedIds = new Set([id]);
+      let foundChild = true;
+      while (foundChild) {
+        foundChild = false;
+        pages.forEach((page) => {
+          if (
+            page.parentId &&
+            deletedIds.has(page.parentId) &&
+            !deletedIds.has(page.id)
+          ) {
+            deletedIds.add(page.id);
+            foundChild = true;
+          }
+        });
+      }
+      deletedIds.forEach((deletedId) => deletingIds.current.add(deletedId));
+
+      if (cloudMode) {
+        const { error } = await createClient()
+          .from("pages")
+          .delete()
+          .eq("id", id);
+        if (error) {
+          deletedIds.forEach((deletedId) =>
+            deletingIds.current.delete(deletedId),
+          );
+          setNotice("This page could not be deleted.");
+          return;
+        }
+      }
+
+      let remaining = pages.filter((page) => !deletedIds.has(page.id));
+      if (!remaining.length) {
+        remaining = [
+          {
+            id: makeId(),
+            parentId: null,
+            title: "Untitled",
+            content: "<p></p>",
+            updatedAt: Date.now(),
+          },
+        ];
+      }
+      setPages(remaining);
+      if (deletedIds.has(activeId)) {
+        const parent = remaining.find((page) => page.id === target.parentId);
+        setActiveId(parent?.id ?? remaining[0].id);
+      }
+      setExpanded((current) => {
+        const next = new Set(current);
+        deletedIds.forEach((deletedId) => next.delete(deletedId));
+        return next;
+      });
+      setNotice(`Deleted ${target.title || "Untitled"}`);
+      window.setTimeout(() => setNotice(""), 2200);
+    },
+    [activeId, cloudMode, pages],
+  );
+
   const openAi = useCallback((selectedText = "") => {
     setSelection(selectedText);
     setAiOpen(true);
@@ -253,6 +384,7 @@ export function Workspace() {
                 })
               }
               onAdd={createPage}
+              onDelete={deletePage}
             />
           </nav>
 
@@ -261,7 +393,25 @@ export function Workspace() {
               <Settings size={16} />
               Settings
             </button>
-            <div className="user-avatar">C</div>
+            {cloudMode ? (
+              <button
+                type="button"
+                className="sign-out"
+                title={`Sign out${userEmail ? ` ${userEmail}` : ""}`}
+                aria-label="Sign out"
+                onClick={async () => {
+                  await createClient().auth.signOut();
+                  router.refresh();
+                }}
+              >
+                <span className="user-avatar">
+                  {userEmail?.charAt(0).toUpperCase() || "W"}
+                </span>
+                <LogOut size={14} />
+              </button>
+            ) : (
+              <div className="user-avatar">C</div>
+            )}
           </div>
         </aside>
       )}
@@ -331,7 +481,8 @@ export function Workspace() {
           provider={provider}
           model={model}
           selection={selection}
-          apiKey={apiKey}
+          apiKey={cloudMode ? "" : apiKey}
+          hasKey={Boolean(apiKey) || hasStoredKey}
           onClose={() => setAiOpen(false)}
           onSettings={() => setSettingsOpen(true)}
         />
@@ -342,13 +493,31 @@ export function Workspace() {
           provider={provider}
           model={model}
           apiKey={apiKey}
+          secureStorage={cloudMode}
           onClose={() => setSettingsOpen(false)}
-          onSave={(nextProvider, nextModel, nextKey) => {
+          onSave={async (nextProvider, nextModel, nextKey) => {
+            if (cloudMode) {
+              const response = await fetch("/api/ai/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  provider: nextProvider,
+                  model: nextModel,
+                  apiKey: nextKey,
+                }),
+              });
+              if (!response.ok) {
+                setNotice("AI settings could not be saved.");
+                return;
+              }
+              setHasStoredKey(true);
+            } else {
+              setApiKey(nextKey);
+              localStorage.setItem("storytree-ai-provider", nextProvider);
+              localStorage.setItem("storytree-ai-model", nextModel);
+            }
             setProvider(nextProvider);
             setModel(nextModel);
-            setApiKey(nextKey);
-            localStorage.setItem("storytree-ai-provider", nextProvider);
-            localStorage.setItem("storytree-ai-model", nextModel);
             setSettingsOpen(false);
             setNotice("AI settings saved");
             window.setTimeout(() => setNotice(""), 2200);
@@ -370,6 +539,7 @@ type PageBranchProps = {
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
   onAdd: (parentId: string, title?: string) => StoryPage;
+  onDelete: (id: string) => void;
 };
 
 function PageBranch({
@@ -381,6 +551,7 @@ function PageBranch({
   onSelect,
   onToggle,
   onAdd,
+  onDelete,
 }: PageBranchProps) {
   return pages
     .filter((page) => page.parentId === parentId)
@@ -421,6 +592,15 @@ function PageBranch({
             >
               <Plus size={14} />
             </button>
+            <button
+              type="button"
+              className="row-delete"
+              aria-label={`Delete ${page.title}`}
+              title="Delete page"
+              onClick={() => onDelete(page.id)}
+            >
+              <Trash2 size={13} />
+            </button>
           </div>
           {expanded.has(page.id) && (
             <div className="tree-children">
@@ -433,6 +613,7 @@ function PageBranch({
                 onSelect={onSelect}
                 onToggle={onToggle}
                 onAdd={onAdd}
+                onDelete={onDelete}
               />
             </div>
           )}
@@ -446,6 +627,7 @@ function AiPanel({
   model,
   selection,
   apiKey,
+  hasKey,
   onClose,
   onSettings,
 }: {
@@ -453,6 +635,7 @@ function AiPanel({
   model: string;
   selection: string;
   apiKey: string;
+  hasKey: boolean;
   onClose: () => void;
   onSettings: () => void;
 }) {
@@ -460,10 +643,9 @@ function AiPanel({
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const hasKey = Boolean(apiKey);
 
   async function askAi() {
-    if (!prompt.trim() || !apiKey || loading) return;
+    if (!prompt.trim() || !hasKey || loading) return;
     setLoading(true);
     setAnswer("");
     setError("");
@@ -474,7 +656,7 @@ function AiPanel({
         body: JSON.stringify({
           provider,
           model,
-          apiKey,
+          apiKey: apiKey || undefined,
           prompt,
           context: selection || undefined,
         }),
@@ -589,12 +771,14 @@ function SettingsDialog({
   provider,
   model,
   apiKey,
+  secureStorage,
   onClose,
   onSave,
 }: {
   provider: AiProvider;
   model: string;
   apiKey: string;
+  secureStorage: boolean;
   onClose: () => void;
   onSave: (provider: AiProvider, model: string, apiKey: string) => void;
 }) {
@@ -664,14 +848,18 @@ function SettingsDialog({
               type="password"
               value={nextKey}
               onChange={(event) => setNextKey(event.target.value)}
-              placeholder="Paste your provider API key"
+              placeholder={
+                secureStorage
+                  ? "Paste a key to save or replace"
+                  : "Paste your provider API key"
+              }
               autoComplete="off"
             />
           </label>
           <p className="security-note">
-            During local development, your key stays in memory and disappears
-            when the tab closes. Cloud storage will be encrypted after
-            Supabase is connected.
+            {secureStorage
+              ? "Your key is encrypted before database storage and is never returned to this browser."
+              : "Your key stays in memory and disappears when the tab closes."}
           </p>
         </div>
         <footer>

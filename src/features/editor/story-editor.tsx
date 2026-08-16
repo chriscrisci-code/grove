@@ -71,6 +71,9 @@ export function StoryEditor({
   const [listening, setListening] = useState(false);
   const [dictationStatus, setDictationStatus] = useState("");
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const committedSpeechRef = useRef(
+    new Map<number, { text: string; committedAt: number }>(),
+  );
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -168,22 +171,42 @@ export function StoryEditor({
     }
 
     const recognition = new Recognition();
+    committedSpeechRef.current.clear();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
     recognition.onresult = (event) => {
-      let finalText = "";
+      const finalSegments: string[] = [];
       let interimText = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      for (
+        let index = event.resultIndex;
+        index < event.results.length;
+        index += 1
+      ) {
         const result = event.results[index];
-        if (result.isFinal) finalText += result[0].transcript;
-        else interimText += result[0].transcript;
+        const transcript = result[0].transcript.trim();
+        if (result.isFinal && transcript) {
+          const previous = committedSpeechRef.current.get(index);
+          const duplicate =
+            previous?.text.toLocaleLowerCase() ===
+              transcript.toLocaleLowerCase() &&
+            Date.now() - previous.committedAt < 10_000;
+          if (!duplicate) {
+            finalSegments.push(transcript);
+            committedSpeechRef.current.set(index, {
+              text: transcript,
+              committedAt: Date.now(),
+            });
+          }
+        } else {
+          interimText += transcript;
+        }
       }
-      if (finalText.trim()) {
+      if (finalSegments.length) {
         dictationEditor
           .chain()
           .focus()
-          .insertContent(`${finalText.trim()} `)
+          .insertContent(`${finalSegments.join(" ")} `)
           .run();
       }
       setDictationStatus(

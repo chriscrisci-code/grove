@@ -29,7 +29,7 @@ export function RelationshipsView({
   onCreateEvent,
   onUpdatePage,
 }: RelationshipsViewProps) {
-  const [view, setView] = useState<"web" | "timeline">("web");
+  const [view, setView] = useState<"web" | "timeline">("timeline");
 
   return (
     <div className="relationship-web">
@@ -40,18 +40,18 @@ export function RelationshipsView({
             <button
               type="button"
               role="tab"
-              aria-selected={view === "web"}
-              onClick={() => setView("web")}
-            >
-              Web
-            </button>
-            <button
-              type="button"
-              role="tab"
               aria-selected={view === "timeline"}
               onClick={() => setView("timeline")}
             >
               Timeline
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "web"}
+              onClick={() => setView("web")}
+            >
+              Web
             </button>
           </div>
         </div>
@@ -65,6 +65,7 @@ export function RelationshipsView({
           pages={pages}
           relationships={relationships}
           onOpenPage={onOpenPage}
+          onUpdatePage={onUpdatePage}
         />
       ) : (
         <RelationshipTimeline

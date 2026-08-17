@@ -1409,7 +1409,7 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
+  width: 4px;
   transform: translateX(-50%);
   opacity: .72;
   pointer-events: none;
@@ -1441,10 +1441,21 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   border-left-width: 2px;
   border-radius: 6px;
   background: #fffcf6;
-  padding: 4px 5px;
+  padding: 8px 5px 4px;
   cursor: pointer;
   touch-action: none;
   user-select: none;
+}
+.timeline-card-snap {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #fffcf6;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 .timeline-card.dragging,
 .timeline-card:hover { z-index: 3; }
@@ -1513,7 +1524,8 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   font-size: 11px;
   text-anchor: middle;
 }
-.relationship-node { cursor: pointer; }
+.relationship-node { cursor: grab; }
+.relationship-node.dragging { cursor: grabbing; }
 .relationship-node text {
   fill: #fff;
   font-size: 9px;

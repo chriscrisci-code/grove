@@ -404,6 +404,11 @@ export function RelationshipTimeline({
                   setCardDrag(null);
                 }}
               >
+                <span
+                  className="timeline-card-snap"
+                  style={{ background: TIMELINE_LANE_COLORS[lane] }}
+                  aria-hidden="true"
+                />
                 <i style={{ background: PAGE_TYPE_COLORS[page.pageType] }} />
                 <div>
                   <small>{PAGE_TYPE_LABELS[page.pageType]}</small>

@@ -74,7 +74,7 @@ export function timelineLaneCenter(lane: number, usableWidth: number): number {
 
 export function timelineCardWidth(usableWidth: number, boardWidth: number): number {
   const laneWidth = usableWidth / TIMELINE_LANE_COUNT;
-  return Math.min(Math.max(laneWidth * 1.7, 96), boardWidth * 0.5);
+  return Math.min(Math.max(laneWidth * 2.55, 144), boardWidth * 0.75);
 }
 
 export function withTimelineY(

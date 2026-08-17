@@ -6,6 +6,7 @@ import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
   Bold,
+  FilePlus2,
   Heading2,
   Italic,
   List,
@@ -14,7 +15,7 @@ import {
   MicOff,
   Quote,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type SpeechResult = {
   isFinal: boolean;
@@ -116,9 +117,84 @@ export function StoryEditor({
     }),
   });
 
+  const createPageFromEditorText = useCallback(
+    (removeSlashCommand = false) => {
+      if (!editor) return false;
+      const { from, to, $from } = editor.state.selection;
+      let title = "";
+      let linkFrom = from;
+      let linkTo = to;
+      let removeFrom: number | null = null;
+
+      if (removeSlashCommand) {
+        if (from !== to) return false;
+        const beforeCaret = $from.parent.textBetween(
+          0,
+          $from.parentOffset,
+          " ",
+        );
+        if (!beforeCaret.endsWith("/page")) return false;
+        const beforeCommand = beforeCaret.slice(0, -"/page".length);
+        const match = beforeCommand.match(/[\p{L}\p{N}_'-]+(?=\s*$)/u);
+        if (!match || match.index === undefined) return false;
+        title = match[0];
+        linkFrom = $from.start() + match.index;
+        linkTo = linkFrom + title.length;
+        removeFrom = linkTo;
+      } else if (from !== to) {
+        const selectedText = editor.state.doc.textBetween(from, to, " ");
+        title = selectedText.trim();
+        if (!title) return false;
+        const leadingWhitespace = selectedText.indexOf(title);
+        linkFrom = from + leadingWhitespace;
+        linkTo = linkFrom + title.length;
+      } else {
+        const beforeCaret = $from.parent.textBetween(
+          0,
+          $from.parentOffset,
+          " ",
+        );
+        const match = beforeCaret.match(/[\p{L}\p{N}_'-]+$/u);
+        if (!match) return false;
+        title = match[0];
+        linkFrom = $from.pos - title.length;
+        linkTo = $from.pos;
+      }
+
+      onCreatePage(title, (href) => {
+        const chain = editor.chain().focus();
+        if (removeFrom !== null) {
+          chain.deleteRange({ from: removeFrom, to });
+        }
+        chain
+          .setTextSelection({ from: linkFrom, to: linkTo })
+          .setLink({ href })
+          .setTextSelection(linkTo)
+          .run();
+      });
+      return true;
+    },
+    [editor, onCreatePage],
+  );
+
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
-      if (!editor || !event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!editor) return;
+
+      const noModifiers =
+        !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+      if (
+        editor.isFocused &&
+        noModifiers &&
+        !event.isComposing &&
+        (event.key === "Enter" || event.key === " ") &&
+        createPageFromEditorText(true)
+      ) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!event.altKey || event.ctrlKey || event.metaKey) return;
 
       if (event.key.toLowerCase() === "a") {
         event.preventDefault();
@@ -129,28 +205,12 @@ export function StoryEditor({
 
       if (event.key.toLowerCase() !== "p") return;
       event.preventDefault();
-      const { $from } = editor.state.selection;
-      const beforeCaret = $from.parent.textBetween(0, $from.parentOffset, " ");
-      const match = beforeCaret.match(/[\p{L}\p{N}_'-]+$/u);
-      if (!match) return;
-
-      const title = match[0];
-      const from = $from.pos - title.length;
-      const to = $from.pos;
-      onCreatePage(title, (href) => {
-        editor
-          .chain()
-          .focus()
-          .setTextSelection({ from, to })
-          .setLink({ href })
-          .setTextSelection(to)
-          .run();
-      });
+      createPageFromEditorText();
     }
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [editor, onCreatePage, onOpenAi]);
+  }, [createPageFromEditorText, editor, onOpenAi]);
 
   if (!editor) return <div className="editor-loading">Opening your page…</div>;
   const dictationEditor = editor;
@@ -302,6 +362,17 @@ export function StoryEditor({
           </button>
         ))}
         <span className="toolbar-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="page-create-button"
+          title="Create a linked page from selected text or the previous word"
+          aria-label="Create linked page"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => createPageFromEditorText()}
+        >
+          <FilePlus2 size={16} />
+          <span>Page</span>
+        </button>
         <button
           type="button"
           className={`dictation-button ${listening ? "listening" : ""}`}

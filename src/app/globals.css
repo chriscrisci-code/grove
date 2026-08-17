@@ -749,7 +749,8 @@ kbd {
   margin: 0 4px;
   background: var(--line);
 }
-.editor-toolbar .dictation-button {
+.editor-toolbar .dictation-button,
+.editor-toolbar .page-create-button {
   display: flex;
   width: auto;
   align-items: center;
@@ -759,6 +760,7 @@ kbd {
   font-size: 10px;
   font-weight: 650;
 }
+.editor-toolbar .page-create-button { color: #526357; }
 .editor-toolbar .dictation-button.listening {
   background: #e9f0e9;
   color: #315c42;
@@ -1419,7 +1421,8 @@ kbd {
   }
   .editor-toolbar::-webkit-scrollbar { display: none; }
   .editor-toolbar button { width: 38px; height: 38px; flex: 0 0 38px; }
-  .editor-toolbar .dictation-button {
+  .editor-toolbar .dictation-button,
+  .editor-toolbar .page-create-button {
     width: auto;
     flex: 0 0 auto;
     order: -2;

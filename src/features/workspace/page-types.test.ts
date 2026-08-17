@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyPageTypeChange, reorderAmong } from "./page-tree";
-import { normalizePageType } from "./page-types";
+import { normalizePageType, parseAkaNames } from "./page-types";
 
 const pages = [
   { id: "notes", parentId: null, pageType: "page" as const },
@@ -43,5 +43,12 @@ describe("page types and chapter order", () => {
       next.filter((page) => page.pageType === "chapter").map((page) => page.id),
     ).toEqual(["two", "one"]);
     expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
+  });
+
+  it("splits also-known-as names on commas", () => {
+    expect(parseAkaNames("E-Town, the White City, e-town")).toEqual([
+      "E-Town",
+      "the White City",
+    ]);
   });
 });

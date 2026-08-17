@@ -13,6 +13,7 @@ export type PageType = (typeof PAGE_TYPES)[number];
 export type PageFieldDef = {
   key: string;
   label: string;
+  placeholder?: string;
 };
 
 export const PAGE_TYPE_LABELS: Record<PageType, string> = {
@@ -25,17 +26,24 @@ export const PAGE_TYPE_LABELS: Record<PageType, string> = {
   unique_object: "Unique object",
 };
 
+const AKA_FIELD: PageFieldDef = {
+  key: "aka",
+  label: "Also known as",
+  placeholder: "Comma-separated names",
+};
+
 export const PAGE_TYPE_FIELDS: Record<PageType, PageFieldDef[]> = {
   page: [],
   chapter: [],
   character: [
     { key: "role", label: "Role" },
     { key: "wants", label: "Wants" },
+    AKA_FIELD,
   ],
-  location: [{ key: "region", label: "Region" }],
-  animal: [{ key: "species", label: "Species" }],
-  transport: [{ key: "kind", label: "Kind" }],
-  unique_object: [{ key: "owner", label: "Owner" }],
+  location: [{ key: "region", label: "Region" }, AKA_FIELD],
+  animal: [{ key: "species", label: "Species" }, AKA_FIELD],
+  transport: [{ key: "kind", label: "Kind" }, AKA_FIELD],
+  unique_object: [{ key: "owner", label: "Owner" }, AKA_FIELD],
 };
 
 export const PAGE_TYPE_COLORS: Record<PageType, string> = {
@@ -64,6 +72,24 @@ export function normalizePageFields(value: unknown): Record<string, string> {
       typeof field === "string" ? field : String(field ?? ""),
     ]),
   );
+}
+
+export function parseAkaNames(value: string | undefined): string[] {
+  if (!value) return [];
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const part of value.split(",")) {
+    const name = part.trim();
+    const key = name.toLocaleLowerCase();
+    if (name.length < 2 || key === "untitled" || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
+export function pageTypeHasAka(pageType: PageType) {
+  return PAGE_TYPE_FIELDS[pageType].some((field) => field.key === "aka");
 }
 
 export type StoryRelationship = {

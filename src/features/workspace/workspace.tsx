@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  CircleHelp,
   FileText,
   GitFork,
   GripVertical,
@@ -37,6 +38,7 @@ import { StoryEditor } from "@/features/editor/story-editor";
 import { RelationshipWeb } from "@/features/relationships/relationship-web";
 import { ResearchView } from "@/features/research/research-view";
 import { ManuscriptPreview } from "@/features/workspace/manuscript-preview";
+import { HelpDialog } from "@/features/workspace/help-dialog";
 import { createClient } from "@/lib/supabase/client";
 import {
   applyPageDrop,
@@ -52,6 +54,8 @@ import {
   RELATIONSHIP_SUGGESTIONS,
   normalizePageFields,
   normalizePageType,
+  pageTypeHasAka,
+  parseAkaNames,
   type PageType,
   type StoryRelationship,
 } from "@/features/workspace/page-types";
@@ -177,6 +181,7 @@ export function Workspace({
   const [aiOpen, setAiOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [selection, setSelection] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
@@ -1555,6 +1560,15 @@ export function Workspace({
                 <kbd>Alt A</kbd>
               </button>
             )}
+            <button
+              type="button"
+              className="help-button"
+              title="Page help"
+              aria-label="Page help"
+              onClick={() => setHelpOpen(true)}
+            >
+              <CircleHelp size={17} />
+            </button>
           </div>
         </header>
 
@@ -1612,10 +1626,14 @@ export function Workspace({
             {PAGE_TYPE_FIELDS[activePage.pageType].length > 0 && (
               <div className="page-type-fields">
                 {PAGE_TYPE_FIELDS[activePage.pageType].map((field) => (
-                  <label key={field.key}>
+                  <label
+                    key={field.key}
+                    className={field.key === "aka" ? "aka-field" : undefined}
+                  >
                     <span>{field.label}</span>
                     <input
                       value={activePage.fields[field.key] ?? ""}
+                      placeholder={field.placeholder}
                       onChange={(event) =>
                         updateActivePage({
                           fields: {
@@ -1738,6 +1756,9 @@ export function Workspace({
               linkablePages={pages.map((page) => ({
                 id: page.id,
                 title: page.title,
+                aliases: pageTypeHasAka(page.pageType)
+                  ? parseAkaNames(page.fields.aka)
+                  : undefined,
               }))}
               currentPageId={activePage.id}
               onFindLinks={(count) => {
@@ -1830,6 +1851,8 @@ export function Workspace({
           }}
         />
       )}
+
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
 
       {tagPickerPage && (
         <TagPicker

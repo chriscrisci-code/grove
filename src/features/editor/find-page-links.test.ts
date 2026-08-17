@@ -33,4 +33,25 @@ describe("find page title matches", () => {
       { from: 0, to: 8, pageId: "evermere" },
     ]);
   });
+
+  it("links also-known-as names back to the titled page", () => {
+    expect(
+      findPageTitleMatches("They left E-Town at dusk.", [
+        {
+          id: "evermere",
+          title: "Evermere",
+          aliases: ["E-Town", "the White City"],
+        },
+      ]),
+    ).toEqual([{ from: 10, to: 16, pageId: "evermere" }]);
+  });
+
+  it("lets a real page title win over another page's alias", () => {
+    expect(
+      findPageTitleMatches("E-Town", [
+        { id: "evermere", title: "Evermere", aliases: ["E-Town"] },
+        { id: "etown", title: "E-Town" },
+      ]),
+    ).toEqual([{ from: 0, to: 6, pageId: "etown" }]);
+  });
 });

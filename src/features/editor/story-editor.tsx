@@ -76,7 +76,7 @@ type StoryEditorProps = {
   onOpenTags: (pageId: string | null) => void;
   onOpenRelate: (pageId: string | null) => void;
   onNavigatePage: (pageId: string) => void;
-  linkablePages: { id: string; title: string }[];
+  linkablePages: { id: string; title: string; aliases?: string[] }[];
   currentPageId: string;
   onFindLinks: (count: number) => void;
 };

@@ -1,12 +1,18 @@
 export type LinkablePage = {
   id: string;
   title: string;
+  aliases?: string[];
 };
 
 export type TitleMatch = {
   from: number;
   to: number;
   pageId: string;
+};
+
+type CatalogEntry = {
+  id: string;
+  text: string;
 };
 
 function isLetterOrNumber(char: string | undefined) {
@@ -28,17 +34,31 @@ function rangeIsFree(used: boolean[], from: number, to: number) {
   return true;
 }
 
-export function catalogLinkablePages(pages: LinkablePage[]): LinkablePage[] {
+function addCatalogEntry(
+  catalog: CatalogEntry[],
+  seen: Set<string>,
+  id: string,
+  text: string,
+) {
+  const trimmed = text.trim();
+  const key = trimmed.toLocaleLowerCase();
+  if (trimmed.length < 2 || key === "untitled" || seen.has(key)) return;
+  seen.add(key);
+  catalog.push({ id, text: trimmed });
+}
+
+export function catalogLinkablePages(pages: LinkablePage[]): CatalogEntry[] {
   const seen = new Set<string>();
-  const catalog: LinkablePage[] = [];
+  const catalog: CatalogEntry[] = [];
   for (const page of pages) {
-    const title = page.title.trim();
-    const key = title.toLocaleLowerCase();
-    if (title.length < 2 || key === "untitled" || seen.has(key)) continue;
-    seen.add(key);
-    catalog.push({ id: page.id, title });
+    addCatalogEntry(catalog, seen, page.id, page.title);
   }
-  return catalog.sort((a, b) => b.title.length - a.title.length);
+  for (const page of pages) {
+    for (const alias of page.aliases ?? []) {
+      addCatalogEntry(catalog, seen, page.id, alias);
+    }
+  }
+  return catalog.sort((a, b) => b.text.length - a.text.length);
 }
 
 export function findPageTitleMatches(
@@ -52,8 +72,8 @@ export function findPageTitleMatches(
   const used = Array.from({ length: text.length }, () => false);
   const matches: TitleMatch[] = [];
 
-  for (const page of catalog) {
-    const needle = page.title.toLocaleLowerCase();
+  for (const entry of catalog) {
+    const needle = entry.text.toLocaleLowerCase();
     let searchFrom = 0;
     while (searchFrom <= lower.length - needle.length) {
       const index = lower.indexOf(needle, searchFrom);
@@ -65,7 +85,7 @@ export function findPageTitleMatches(
         rangeIsFree(used, index, end)
       ) {
         for (let cursor = index; cursor < end; cursor += 1) used[cursor] = true;
-        matches.push({ from: index, to: end, pageId: page.id });
+        matches.push({ from: index, to: end, pageId: entry.id });
       }
       searchFrom = index + 1;
     }

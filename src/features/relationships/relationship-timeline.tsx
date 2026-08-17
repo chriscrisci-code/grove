@@ -17,12 +17,17 @@ import {
   TIMELINE_CARD_HEIGHT,
   TIMELINE_DRAG_THRESHOLD,
   TIMELINE_GROW_BY,
+  TIMELINE_GUTTER,
+  TIMELINE_LANE_COLORS,
   clampTimelineY,
   nextTrayClickY,
   parseStoredExtent,
+  snapTimelineLane,
   splitTimelinePages,
   timelineCanvasHeight,
+  timelineCardWidth,
   timelineExtentStorageKey,
+  timelineLaneCenter,
   withTimelineY,
   withoutTimelineY,
   type TimelineSourcePage,
@@ -32,7 +37,7 @@ type RelationshipTimelineProps = {
   pages: TimelineSourcePage[];
   workspaceId?: string;
   onOpenPage: (pageId: string) => void;
-  onCreateEvent: (y: number) => string;
+  onCreateEvent: (y: number, lane: number) => string;
   onUpdatePage: (
     pageId: string,
     patch: { title?: string; fields?: Record<string, string> },
@@ -41,9 +46,12 @@ type RelationshipTimelineProps = {
 
 type CardDrag = {
   id: string;
+  startClientX: number;
   startClientY: number;
   startY: number;
+  startLane: number;
   liveY: number;
+  liveLane: number;
   moved: boolean;
 };
 
@@ -71,6 +79,7 @@ export function RelationshipTimeline({
   const trayRef = useRef<HTMLDivElement>(null);
   const titleFieldRef = useRef<HTMLInputElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [boardWidth, setBoardWidth] = useState(0);
   const [userExtent, setUserExtent] = useState(0);
   const [namingId, setNamingId] = useState<string | null>(null);
   const [cardDrag, setCardDrag] = useState<CardDrag | null>(null);
@@ -105,9 +114,11 @@ export function RelationshipTimeline({
     if (!board) return;
     const observer = new ResizeObserver(() => {
       setViewportHeight(board.clientHeight);
+      setBoardWidth(board.clientWidth);
     });
     observer.observe(board);
     setViewportHeight(board.clientHeight);
+    setBoardWidth(board.clientWidth);
     return () => observer.disconnect();
   }, []);
 
@@ -130,16 +141,36 @@ export function RelationshipTimeline({
     });
   }
 
+  const usableWidth = Math.max(0, boardWidth - TIMELINE_GUTTER);
+  const cardWidth = timelineCardWidth(usableWidth, boardWidth || 1);
+
   function canvasYFromClient(clientY: number) {
     const board = boardRef.current;
     if (!board) return 8;
-    return clampTimelineY(clientY - board.getBoundingClientRect().top + board.scrollTop - 20);
+    return clampTimelineY(clientY - board.getBoundingClientRect().top + board.scrollTop - 16);
   }
 
-  function placePage(pageId: string, y: number) {
+  function canvasLaneFromClient(clientX: number) {
+    const board = boardRef.current;
+    if (!board) return 0;
+    return snapTimelineLane(
+      clientX - board.getBoundingClientRect().left - TIMELINE_GUTTER,
+      usableWidth,
+    );
+  }
+
+  function cardLeft(lane: number) {
+    const center = TIMELINE_GUTTER + timelineLaneCenter(lane, usableWidth || 1);
+    return Math.min(
+      Math.max(8, center - cardWidth / 2),
+      Math.max(8, boardWidth - cardWidth - 8),
+    );
+  }
+
+  function placePage(pageId: string, y: number, lane?: number) {
     const page = pagesById.get(pageId);
     if (!page) return;
-    onUpdatePage(pageId, { fields: withTimelineY(page.fields, y) });
+    onUpdatePage(pageId, { fields: withTimelineY(page.fields, y, lane) });
     growToFit(y);
   }
 
@@ -191,11 +222,15 @@ export function RelationshipTimeline({
     if (!drag || drag.id !== event.currentTarget.dataset.pageId) return;
     const board = boardRef.current;
     if (!drag.moved) {
-      placePage(drag.id, nextTrayClickY(placed.map((page) => page.timelineY)));
+      placePage(drag.id, nextTrayClickY(placed.map((page) => page.timelineY)), 2);
       return;
     }
     if (board && pointInRect(event.clientX, event.clientY, board.getBoundingClientRect())) {
-      placePage(drag.id, canvasYFromClient(event.clientY));
+      placePage(
+        drag.id,
+        canvasYFromClient(event.clientY),
+        canvasLaneFromClient(event.clientX),
+      );
     }
   }
 
@@ -203,15 +238,19 @@ export function RelationshipTimeline({
     event: ReactPointerEvent<HTMLDivElement>,
     pageId: string,
     startY: number,
+    startLane: number,
   ) {
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest("button, input")) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const next = {
       id: pageId,
+      startClientX: event.clientX,
       startClientY: event.clientY,
       startY,
+      startLane,
       liveY: startY,
+      liveLane: startLane,
       moved: false,
     };
     cardDragRef.current = next;
@@ -224,9 +263,13 @@ export function RelationshipTimeline({
     const next = {
       ...current,
       liveY: clampTimelineY(current.startY + event.clientY - current.startClientY),
+      liveLane: canvasLaneFromClient(event.clientX),
       moved:
         current.moved ||
-        Math.abs(event.clientY - current.startClientY) > TIMELINE_DRAG_THRESHOLD,
+        Math.hypot(
+          event.clientX - current.startClientX,
+          event.clientY - current.startClientY,
+        ) > TIMELINE_DRAG_THRESHOLD,
     };
     cardDragRef.current = next;
     setCardDrag(next);
@@ -247,7 +290,7 @@ export function RelationshipTimeline({
       return;
     }
     if (drag.moved) {
-      placePage(drag.id, drag.liveY);
+      placePage(drag.id, drag.liveY, drag.liveLane);
       return;
     }
     if (namingId !== drag.id) onOpenPage(drag.id);
@@ -256,7 +299,8 @@ export function RelationshipTimeline({
   function createEventAt(event: ReactMouseEvent<HTMLDivElement>) {
     if ((event.target as HTMLElement).closest("[data-timeline-card]")) return;
     const y = canvasYFromClient(event.clientY);
-    const id = onCreateEvent(y);
+    const lane = canvasLaneFromClient(event.clientX);
+    const id = onCreateEvent(y, lane);
     growToFit(y);
     setNamingId(id);
   }
@@ -320,13 +364,24 @@ export function RelationshipTimeline({
           style={{ height: canvasHeight }}
           onDoubleClick={createEventAt}
         >
-          <div className="timeline-spine" />
+          {TIMELINE_LANE_COLORS.map((color, lane) => (
+            <div
+              key={color}
+              className="timeline-lane"
+              style={{
+                left: TIMELINE_GUTTER + timelineLaneCenter(lane, usableWidth || 1),
+                background: color,
+              }}
+            />
+          ))}
           <div className="timeline-time" aria-hidden="true">
             <ArrowDown size={18} />
             <span>Time</span>
           </div>
           {placed.map((page) => {
             const y = cardDrag?.id === page.id ? cardDrag.liveY : page.timelineY;
+            const lane =
+              cardDrag?.id === page.id ? cardDrag.liveLane : page.timelineLane;
             return (
               <div
                 key={page.id}
@@ -335,9 +390,11 @@ export function RelationshipTimeline({
                 className={`timeline-card${cardDrag?.id === page.id ? " dragging" : ""}`}
                 style={{
                   top: y,
+                  left: cardLeft(lane),
+                  width: cardWidth,
                   borderColor: PAGE_TYPE_COLORS[page.pageType],
                 }}
-                onPointerDown={(event) => startCardDrag(event, page.id, y)}
+                onPointerDown={(event) => startCardDrag(event, page.id, y, lane)}
                 onPointerMove={moveCardDrag}
                 onPointerUp={endCardDrag}
                 onPointerCancel={() => {

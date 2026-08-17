@@ -7,9 +7,12 @@ import {
   nextTrayClickY,
   parseStoredExtent,
   parseTimelineY,
+  serializeTimelineLane,
   serializeTimelineY,
+  snapTimelineLane,
   splitTimelinePages,
   timelineCanvasHeight,
+  timelineCardWidth,
   timelineExtentStorageKey,
   withTimelineY,
   withoutTimelineY,
@@ -61,6 +64,15 @@ describe("timeline helpers", () => {
     expect(tray.map((page) => page.id)).toEqual(["one"]);
     expect(placed.map((page) => page.id)).toEqual(["two", "storm"]);
     expect(placed[0]?.timelineY).toBe(12);
+    expect(placed[0]?.timelineLane).toBe(0);
+  });
+
+  it("snaps a drop onto one of six lanes", () => {
+    expect(snapTimelineLane(10, 600)).toBe(0);
+    expect(snapTimelineLane(350, 600)).toBe(3);
+    expect(snapTimelineLane(599, 600)).toBe(5);
+    expect(serializeTimelineLane(9)).toBe("5");
+    expect(timelineCardWidth(600, 720)).toBeLessThanOrEqual(720 / 3);
   });
 
   it("places a tray click after the last item", () => {
@@ -70,8 +82,13 @@ describe("timeline helpers", () => {
 
   it("keeps also-known-as when adding or clearing a timeline Y", () => {
     const placed = withTimelineY({ aka: "The Gale" }, 40);
-    expect(placed).toEqual({ aka: "The Gale", timelineY: "40" });
+    expect(placed).toEqual({
+      aka: "The Gale",
+      timelineY: "40",
+      timelineLane: "0",
+    });
     expect(withoutTimelineY(placed)).toEqual({ aka: "The Gale" });
+    expect(withTimelineY({ aka: "The Gale" }, 40, 4).timelineLane).toBe("4");
   });
 
   it("grows the canvas from viewport, items, and user scroll", () => {

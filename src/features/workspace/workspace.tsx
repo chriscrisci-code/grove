@@ -38,6 +38,7 @@ import { StoryEditor } from "@/features/editor/story-editor";
 import { RelationshipsView } from "@/features/relationships/relationships-view";
 import {
   isTimelinePageType,
+  serializeTimelineLane,
   serializeTimelineY,
   withoutTimelineY,
 } from "@/features/relationships/timeline";
@@ -1627,9 +1628,10 @@ export function Workspace({
               );
             }}
             onClose={() => setRelationshipsOpen(false)}
-            onCreateEvent={(y) => {
+            onCreateEvent={(y, lane) => {
               const page = createPage(null, "Untitled", false, "event", {
                 timelineY: serializeTimelineY(y),
+                timelineLane: serializeTimelineLane(lane),
               });
               return page.id;
             }}

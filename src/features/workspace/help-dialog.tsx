@@ -64,7 +64,7 @@ const SECTIONS = [
       },
       {
         keys: ["Relationships"],
-        text: "See named links as a web. Click a node to return to writing.",
+        text: "See named links as a web, or place Chapters and Events on a timeline. Double-click the timeline to add an Event. Click a card or node to return to writing.",
       },
       {
         keys: ["Alt+A"],

@@ -35,7 +35,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { StoryEditor } from "@/features/editor/story-editor";
-import { RelationshipWeb } from "@/features/relationships/relationship-web";
+import { RelationshipsView } from "@/features/relationships/relationships-view";
+import {
+  isTimelinePageType,
+  serializeTimelineY,
+  withoutTimelineY,
+} from "@/features/relationships/timeline";
 import { ResearchView } from "@/features/research/research-view";
 import { ManuscriptPreview } from "@/features/workspace/manuscript-preview";
 import { HelpDialog } from "@/features/workspace/help-dialog";
@@ -424,6 +429,7 @@ export function Workspace({
       title = "Untitled",
       activate = true,
       pageType: PageType = "page",
+      fields: Record<string, string> = {},
     ) => {
       const page: StoryPage = {
         id: makeId(),
@@ -431,7 +437,7 @@ export function Workspace({
         title,
         content: "<p></p>",
         pageType,
-        fields: {},
+        fields,
         unvisited: !activate,
         updatedAt: Date.now(),
       };
@@ -757,30 +763,51 @@ export function Workspace({
     [cloudMode, pageTags, tags, togglePageTag, userId, workspaceId],
   );
 
-  const updateActivePage = useCallback(
+  const updatePage = useCallback(
     (
+      pageId: string,
       patch: Partial<
         Pick<StoryPage, "title" | "content" | "pageType" | "fields">
       >,
     ) => {
       setPages((current) =>
         current.map((page) =>
-          page.id === activeId
+          page.id === pageId
             ? { ...page, ...patch, updatedAt: Date.now() }
             : page,
         ),
       );
     },
-    [activeId],
+    [],
+  );
+
+  const updateActivePage = useCallback(
+    (
+      patch: Partial<
+        Pick<StoryPage, "title" | "content" | "pageType" | "fields">
+      >,
+    ) => {
+      updatePage(activeId, patch);
+    },
+    [activeId, updatePage],
   );
 
   const changePageType = useCallback((pageId: string, pageType: PageType) => {
     setPages((current) =>
-      applyPageTypeChange(current, pageId, pageType).map((page) =>
-        page.id === pageId || page.parentId === null
-          ? { ...page, updatedAt: Date.now() }
-          : page,
-      ),
+      applyPageTypeChange(current, pageId, pageType).map((page) => {
+        if (page.id !== pageId) {
+          return page.parentId === null
+            ? { ...page, updatedAt: Date.now() }
+            : page;
+        }
+        return {
+          ...page,
+          fields: isTimelinePageType(pageType)
+            ? page.fields
+            : withoutTimelineY(page.fields),
+          updatedAt: Date.now(),
+        };
+      }),
     );
     if (pageType === "chapter") setChaptersOpen(true);
   }, []);
@@ -1582,9 +1609,10 @@ export function Workspace({
             onClose={() => setResearchOpen(false)}
           />
         ) : relationshipsOpen ? (
-          <RelationshipWeb
+          <RelationshipsView
             pages={pages}
             relationships={relationships}
+            workspaceId={workspaceId}
             onOpenPage={(id) => {
               setActiveId(id);
               setRelationshipsOpen(false);
@@ -1599,6 +1627,13 @@ export function Workspace({
               );
             }}
             onClose={() => setRelationshipsOpen(false)}
+            onCreateEvent={(y) => {
+              const page = createPage(null, "Untitled", false, "event", {
+                timelineY: serializeTimelineY(y),
+              });
+              return page.id;
+            }}
+            onUpdatePage={updatePage}
           />
         ) : (
           <article className="document">

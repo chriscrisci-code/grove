@@ -259,14 +259,20 @@ function ProjectCard({
   return (
     <article className="project-card">
       <div className="project-cover">
-        {project.coverUrl ? (
-          <img src={project.coverUrl} alt={`Cover for ${project.name}`} />
-        ) : (
-          <div className="project-cover-placeholder">
-            <BookOpen size={30} />
-            <span>{project.name.charAt(0).toUpperCase()}</span>
-          </div>
-        )}
+        <Link
+          href={`/workspace/${project.id}`}
+          className="project-cover-link"
+          aria-label={`Open ${project.name}`}
+        >
+          {project.coverUrl ? (
+            <img src={project.coverUrl} alt="" />
+          ) : (
+            <div className="project-cover-placeholder">
+              <BookOpen size={30} />
+              <span>{project.name.charAt(0).toUpperCase()}</span>
+            </div>
+          )}
+        </Link>
         <button
           type="button"
           className="cover-upload"

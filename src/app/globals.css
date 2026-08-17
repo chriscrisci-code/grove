@@ -617,7 +617,14 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   content: "";
   pointer-events: none;
 }
-.project-cover > img { width: 100%; height: 100%; object-fit: cover; }
+.project-cover-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+.project-cover-link img { width: 100%; height: 100%; object-fit: cover; }
 .project-cover-placeholder {
   display: grid;
   height: 100%;

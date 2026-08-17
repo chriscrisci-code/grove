@@ -932,7 +932,10 @@ export function Workspace({
               <span>•</span>
               <span>Edited just now</span>
             </div>
-            <div className="document-title-row">
+            <div
+              className="document-title-row"
+              onClick={() => setTagTargetId(activePage.id)}
+            >
               <input
                 className="document-title"
                 value={activePage.title}

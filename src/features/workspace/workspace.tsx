@@ -28,7 +28,6 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -194,7 +193,6 @@ export function Workspace({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<PageDrop | null>(null);
   const deletingIds = useRef(new Set<string>());
-  const titleFieldRef = useRef<HTMLTextAreaElement>(null);
   const sidebarWidthRef = useRef(274);
   const tagPanelHeightRef = useRef(180);
   const pageDragRef = useRef<{
@@ -1026,18 +1024,6 @@ export function Workspace({
     window.addEventListener("pointerup", stop);
   }
 
-  useLayoutEffect(() => {
-    const field = titleFieldRef.current;
-    if (!field) return;
-    function sizeTitle() {
-      field.style.height = "0px";
-      field.style.height = `${field.scrollHeight}px`;
-    }
-    sizeTitle();
-    window.addEventListener("resize", sizeTitle);
-    return () => window.removeEventListener("resize", sizeTitle);
-  }, [activePage?.id, activePage?.title, relationshipsOpen, researchOpen]);
-
   if (!activePage) return null;
   const sidebarMode =
     sidebarWidth < 112 ? "rail" : sidebarWidth < 190 ? "compact" : "full";
@@ -1666,7 +1652,6 @@ export function Workspace({
               onClick={() => setTagTargetId(activePage.id)}
             >
               <textarea
-                ref={titleFieldRef}
                 className="document-title"
                 rows={1}
                 value={activePage.title}

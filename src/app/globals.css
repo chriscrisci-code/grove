@@ -978,6 +978,7 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   outline: 0;
   resize: none;
   overflow: hidden;
+  field-sizing: content;
   background: transparent;
   color: #292e29;
   font: 700 clamp(38px, 5vw, 54px)/1.08 Georgia, serif;

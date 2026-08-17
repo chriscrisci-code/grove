@@ -30,11 +30,11 @@ const SECTIONS = [
     items: [
       {
         keys: ["Alt+T", "/t"],
-        text: "Tag the last linked page. Click the title first to tag this page instead.",
+        text: "Tag the last linked page. Click the title first to tag or relate this page instead.",
       },
       {
         keys: ["Alt+R", "/r"],
-        text: "Name a relationship to another page. A linked name relates this page to that one; the title asks you to pick a page.",
+        text: "Name a relationship to another page. A linked name relates this page to that one. Click the title first to pick any page from here.",
       },
     ],
   },

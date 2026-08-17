@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -193,6 +194,7 @@ export function Workspace({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<PageDrop | null>(null);
   const deletingIds = useRef(new Set<string>());
+  const titleFieldRef = useRef<HTMLTextAreaElement>(null);
   const sidebarWidthRef = useRef(274);
   const tagPanelHeightRef = useRef(180);
   const pageDragRef = useRef<{
@@ -1024,6 +1026,18 @@ export function Workspace({
     window.addEventListener("pointerup", stop);
   }
 
+  useLayoutEffect(() => {
+    const field = titleFieldRef.current;
+    if (!field) return;
+    function sizeTitle() {
+      field.style.height = "0px";
+      field.style.height = `${field.scrollHeight}px`;
+    }
+    sizeTitle();
+    window.addEventListener("resize", sizeTitle);
+    return () => window.removeEventListener("resize", sizeTitle);
+  }, [activePage?.id, activePage?.title, relationshipsOpen, researchOpen]);
+
   if (!activePage) return null;
   const sidebarMode =
     sidebarWidth < 112 ? "rail" : sidebarWidth < 190 ? "compact" : "full";
@@ -1651,38 +1665,21 @@ export function Workspace({
               className="document-title-row"
               onClick={() => setTagTargetId(activePage.id)}
             >
-              <input
+              <textarea
+                ref={titleFieldRef}
                 className="document-title"
+                rows={1}
                 value={activePage.title}
                 onChange={(event) =>
-                  updateActivePage({ title: event.target.value })
+                  updateActivePage({
+                    title: event.target.value.replace(/\s*\n+\s*/g, " "),
+                  })
                 }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.preventDefault();
+                }}
                 aria-label="Page title"
               />
-              <button
-                type="button"
-                className="title-tag-button"
-                title="Tag this page"
-                aria-label={`Tag ${activePage.title || "this page"}`}
-                onClick={() => {
-                  setTagTargetId(activePage.id);
-                  setTagPickerTargetId(activePage.id);
-                }}
-              >
-                <Tag size={16} />
-              </button>
-              <button
-                type="button"
-                className="title-tag-button"
-                title="Relate this page"
-                aria-label={`Relate ${activePage.title || "this page"}`}
-                onClick={() => {
-                  setTagTargetId(activePage.id);
-                  setRelatePicker({ fromId: activePage.id });
-                }}
-              >
-                <GitFork size={16} />
-              </button>
             </div>
             {(pageTags[activePage.id] ?? []).length > 0 && (
               <div className="page-tag-list" aria-label="Page tags">

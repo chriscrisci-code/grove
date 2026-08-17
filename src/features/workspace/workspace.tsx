@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  GripVertical,
   LibraryBig,
   LogOut,
   Menu,
@@ -33,6 +34,11 @@ import {
 import { StoryEditor } from "@/features/editor/story-editor";
 import { ResearchView } from "@/features/research/research-view";
 import { createClient } from "@/lib/supabase/client";
+import {
+  applyPageDrop,
+  dropPlacementFromOffset,
+  type PageDrop,
+} from "@/features/workspace/page-tree";
 
 export type StoryPage = {
   id: string;
@@ -143,9 +149,19 @@ export function Workspace({
   const [model, setModel] = useState("gpt-5-mini");
   const [apiKey, setApiKey] = useState("");
   const [hasStoredKey, setHasStoredKey] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<PageDrop | null>(null);
   const deletingIds = useRef(new Set<string>());
   const sidebarWidthRef = useRef(274);
   const tagPanelHeightRef = useRef(180);
+  const pageDragRef = useRef<{
+    pointerId: number;
+    pageId: string;
+    started: boolean;
+    startX: number;
+    startY: number;
+    drop: PageDrop | null;
+  } | null>(null);
 
   useEffect(() => {
     const stored = Number(localStorage.getItem("grove-sidebar-width"));
@@ -185,6 +201,10 @@ export function Workspace({
     });
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    return () => document.body.classList.remove("dragging-pages");
   }, []);
 
   useEffect(() => {
@@ -336,6 +356,107 @@ export function Workspace({
       return page;
     },
     [],
+  );
+
+  const movePage = useCallback(
+    (draggedId: string, drop: PageDrop) => {
+      setPages((current) => {
+        const next = applyPageDrop(current, draggedId, drop);
+        if (!next) return current;
+        return next.map((page) =>
+          page.id === draggedId ? { ...page, updatedAt: Date.now() } : page,
+        );
+      });
+      if (drop.type === "inside") {
+        setExpanded((current) => new Set(current).add(drop.targetId));
+      }
+      const target = pages.find((page) => page.id === drop.targetId);
+      const dragged = pages.find((page) => page.id === draggedId);
+      if (target && dragged) {
+        setNotice(
+          drop.type === "inside"
+            ? `Moved ${dragged.title || "Untitled"} inside ${
+                target.title || "Untitled"
+              }`
+            : `Moved ${dragged.title || "Untitled"}`,
+        );
+        window.setTimeout(() => setNotice(""), 1800);
+      }
+    },
+    [pages],
+  );
+
+  const startPageDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>, pageId: string) => {
+      if (search.trim() || sidebarWidth < 112) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      pageDragRef.current = {
+        pointerId: event.pointerId,
+        pageId,
+        started: false,
+        startX: event.clientX,
+        startY: event.clientY,
+        drop: null,
+      };
+    },
+    [search, sidebarWidth],
+  );
+
+  const updatePageDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const drag = pageDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (!drag.started) {
+        if (
+          Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) <
+          6
+        ) {
+          return;
+        }
+        drag.started = true;
+        setDraggingId(drag.pageId);
+        document.body.classList.add("dragging-pages");
+      }
+      const node = document.elementFromPoint(event.clientX, event.clientY);
+      const row = node?.closest<HTMLElement>("[data-page-id]");
+      const targetId = row?.dataset.pageId;
+      if (!row || !targetId || targetId === drag.pageId) {
+        drag.drop = null;
+        setDropTarget(null);
+        return;
+      }
+      const rect = row.getBoundingClientRect();
+      const drop: PageDrop = {
+        type: dropPlacementFromOffset((event.clientY - rect.top) / rect.height),
+        targetId,
+      };
+      const preview = applyPageDrop(pages, drag.pageId, drop);
+      if (!preview) {
+        drag.drop = null;
+        setDropTarget(null);
+        return;
+      }
+      drag.drop = drop;
+      setDropTarget(drop);
+    },
+    [pages],
+  );
+
+  const finishPageDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const drag = pageDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      pageDragRef.current = null;
+      document.body.classList.remove("dragging-pages");
+      const drop = drag.drop;
+      const pageId = drag.pageId;
+      setDraggingId(null);
+      setDropTarget(null);
+      if (drag.started && drop) movePage(pageId, drop);
+    },
+    [movePage],
   );
 
   const createLinkedPage = useCallback(
@@ -659,12 +780,33 @@ export function Workspace({
           </div>
 
           <nav className="page-tree" aria-label="Story pages">
+            {draggingId && dropTarget && (
+              <div className="page-drop-hint" role="status">
+                {dropTarget.type === "inside"
+                  ? `Drop inside ${
+                      pages.find((page) => page.id === dropTarget.targetId)
+                        ?.title || "page"
+                    }`
+                  : dropTarget.type === "before"
+                    ? `Drop before ${
+                        pages.find((page) => page.id === dropTarget.targetId)
+                          ?.title || "page"
+                      }`
+                    : `Drop after ${
+                        pages.find((page) => page.id === dropTarget.targetId)
+                          ?.title || "page"
+                      }`}
+              </div>
+            )}
             <PageBranch
               pages={filteredPages}
               allPages={pages}
               parentId={null}
               activeId={activeId}
               expanded={expanded}
+              draggingId={draggingId}
+              dropTarget={dropTarget}
+              canDrag={!search.trim() && sidebarMode !== "rail"}
               onSelect={(id) => {
                 setActiveId(id);
                 setTagTargetId(null);
@@ -688,6 +830,9 @@ export function Workspace({
               }
               onAdd={createPage}
               onDelete={deletePage}
+              onDragStart={startPageDrag}
+              onDragMove={updatePageDrag}
+              onDragEnd={finishPageDrag}
             />
           </nav>
 
@@ -1153,10 +1298,19 @@ type PageBranchProps = {
   parentId: string | null;
   activeId: string;
   expanded: Set<string>;
+  draggingId: string | null;
+  dropTarget: PageDrop | null;
+  canDrag: boolean;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
   onAdd: (parentId: string, title?: string, activate?: boolean) => StoryPage;
   onDelete: (id: string) => void;
+  onDragStart: (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    pageId: string,
+  ) => void;
+  onDragMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onDragEnd: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 };
 
 function PageBranch({
@@ -1165,10 +1319,16 @@ function PageBranch({
   parentId,
   activeId,
   expanded,
+  draggingId,
+  dropTarget,
+  canDrag,
   onSelect,
   onToggle,
   onAdd,
   onDelete,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
 }: PageBranchProps) {
   return pages
     .filter((page) => page.parentId === parentId)
@@ -1177,10 +1337,28 @@ function PageBranch({
       return (
         <div key={page.id}>
           <div
+            data-page-id={page.id}
             className={`page-row ${activeId === page.id ? "active" : ""} ${
               page.unvisited ? "unvisited" : ""
+            } ${draggingId === page.id ? "dragging" : ""} ${
+              dropTarget?.targetId === page.id ? `drop-${dropTarget.type}` : ""
             }`}
           >
+            {canDrag && (
+              <button
+                type="button"
+                className="page-drag-handle"
+                aria-label={`Reorder ${page.title || "Untitled"}`}
+                title="Drag to reorder or nest"
+                onPointerDown={(event) => onDragStart(event, page.id)}
+                onPointerMove={onDragMove}
+                onPointerUp={onDragEnd}
+                onPointerCancel={onDragEnd}
+                onLostPointerCapture={onDragEnd}
+              >
+                <GripVertical size={13} />
+              </button>
+            )}
             <button
               type="button"
               className="tree-toggle"
@@ -1236,10 +1414,16 @@ function PageBranch({
                 parentId={page.id}
                 activeId={activeId}
                 expanded={expanded}
+                draggingId={draggingId}
+                dropTarget={dropTarget}
+                canDrag={canDrag}
                 onSelect={onSelect}
                 onToggle={onToggle}
                 onAdd={onAdd}
                 onDelete={onDelete}
+                onDragStart={onDragStart}
+                onDragMove={onDragMove}
+                onDragEnd={onDragEnd}
               />
             </div>
           )}

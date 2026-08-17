@@ -339,12 +339,14 @@ export function Workspace({
 
   const createLinkedPage = useCallback(
     (title: string, applyLink: (href: string) => void) => {
+      const sourcePage = pages.find((page) => page.id === activeId);
+      const parentId = sourcePage?.parentId ?? null;
       const existing = pages.find(
         (page) =>
-          page.parentId === activeId &&
+          page.parentId === parentId &&
           page.title.toLowerCase() === title.toLowerCase(),
       );
-      const page = existing ?? createPage(activeId, title, false);
+      const page = existing ?? createPage(parentId, title, false);
       applyLink(`#page-${page.id}`);
       setTagTargetId(page.id);
       setNotice(existing ? `Linked to ${page.title}` : `Created ${page.title}`);

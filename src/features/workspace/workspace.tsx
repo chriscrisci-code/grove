@@ -986,6 +986,19 @@ export function Workspace({
               }
               onTagTargetChange={setTagTargetId}
               onOpenTags={openTagPicker}
+              onNavigatePage={(id) => {
+                if (!pages.some((page) => page.id === id)) return;
+                setActiveId(id);
+                setTagTargetId(null);
+                setTagPickerTargetId(null);
+                setPages((current) =>
+                  current.map((page) =>
+                    page.id === id && page.unvisited
+                      ? { ...page, unvisited: false }
+                      : page,
+                  ),
+                );
+              }}
             />
           </article>
         )}

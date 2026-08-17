@@ -71,6 +71,7 @@ type StoryEditorProps = {
   tagTarget: { id: string; title: string } | null;
   onTagTargetChange: (pageId: string | null) => void;
   onOpenTags: (pageId: string | null) => void;
+  onNavigatePage: (pageId: string) => void;
 };
 
 export function StoryEditor({
@@ -81,6 +82,7 @@ export function StoryEditor({
   tagTarget,
   onTagTargetChange,
   onOpenTags,
+  onNavigatePage,
 }: StoryEditorProps) {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -499,7 +501,19 @@ export function StoryEditor({
           )}
         </div>
       )}
-      <EditorContent editor={editor} />
+      <div
+        onClick={(event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const link = target.closest<HTMLAnchorElement>("a.story-link");
+          const match = link?.getAttribute("href")?.match(/^#page-(.+)$/);
+          if (!match) return;
+          event.preventDefault();
+          onNavigatePage(match[1]);
+        }}
+      >
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

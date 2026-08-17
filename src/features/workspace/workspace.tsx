@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   BrainCircuit,
+  Check,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -15,6 +16,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -39,6 +41,11 @@ export type StoryPage = {
   content: string;
   unvisited: boolean;
   updatedAt: number;
+};
+
+export type StoryTag = {
+  id: string;
+  name: string;
 };
 
 type AiProvider = "openai" | "anthropic" | "google";
@@ -86,6 +93,8 @@ function makeId() {
 
 type WorkspaceProps = {
   initialCloudPages?: StoryPage[];
+  initialTags?: StoryTag[];
+  initialPageTags?: Record<string, string[]>;
   workspaceId?: string;
   workspaceName?: string;
   userId?: string;
@@ -94,6 +103,8 @@ type WorkspaceProps = {
 
 export function Workspace({
   initialCloudPages,
+  initialTags = [],
+  initialPageTags = {},
   workspaceId,
   workspaceName = "My Story",
   userId,
@@ -104,12 +115,21 @@ export function Workspace({
   const startingPages =
     initialCloudPages?.length ? initialCloudPages : initialPages;
   const [pages, setPages] = useState(startingPages);
+  const [tags, setTags] = useState(initialTags);
+  const [pageTags, setPageTags] =
+    useState<Record<string, string[]>>(initialPageTags);
+  const [tagTargetId, setTagTargetId] = useState<string | null>(null);
+  const [tagPickerTargetId, setTagPickerTargetId] = useState<string | null>(
+    null,
+  );
   const [activeId, setActiveId] = useState(startingPages[0]?.id ?? "welcome");
   const [expanded, setExpanded] = useState<Set<string>>(
     new Set(["characters"]),
   );
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(274);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagPanelHeight, setTagPanelHeight] = useState(180);
   const [isNarrow, setIsNarrow] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
@@ -124,13 +144,27 @@ export function Workspace({
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const deletingIds = useRef(new Set<string>());
   const sidebarWidthRef = useRef(274);
+  const tagPanelHeightRef = useRef(180);
 
   useEffect(() => {
     const stored = Number(localStorage.getItem("grove-sidebar-width"));
+    const storedTagHeight = Number(
+      localStorage.getItem("grove-tag-panel-height"),
+    );
     if (Number.isFinite(stored) && stored >= 64 && stored <= 274) {
       queueMicrotask(() => {
         sidebarWidthRef.current = stored;
         setSidebarWidth(stored);
+      });
+    }
+    if (
+      Number.isFinite(storedTagHeight) &&
+      storedTagHeight >= 112 &&
+      storedTagHeight <= 360
+    ) {
+      queueMicrotask(() => {
+        tagPanelHeightRef.current = storedTagHeight;
+        setTagPanelHeight(storedTagHeight);
       });
     }
   }, []);
@@ -158,6 +192,8 @@ export function Workspace({
     const storedActiveId = localStorage.getItem("storytree-active-page");
     const storedProvider = localStorage.getItem("storytree-ai-provider");
     const storedModel = localStorage.getItem("storytree-ai-model");
+    const storedTags = localStorage.getItem("storytree-tags");
+    const storedPageTags = localStorage.getItem("storytree-page-tags");
     queueMicrotask(() => {
       if (raw) {
         try {
@@ -176,6 +212,20 @@ export function Workspace({
         setProvider(storedProvider);
       }
       if (storedModel) setModel(storedModel);
+      if (storedTags) {
+        try {
+          setTags(JSON.parse(storedTags) as StoryTag[]);
+        } catch {
+          localStorage.removeItem("storytree-tags");
+        }
+      }
+      if (storedPageTags) {
+        try {
+          setPageTags(JSON.parse(storedPageTags) as Record<string, string[]>);
+        } catch {
+          localStorage.removeItem("storytree-page-tags");
+        }
+      }
     });
   }, [cloudMode]);
 
@@ -229,6 +279,12 @@ export function Workspace({
   }, [pages, activeId, cloudMode, userId, workspaceId]);
 
   useEffect(() => {
+    if (cloudMode) return;
+    localStorage.setItem("storytree-tags", JSON.stringify(tags));
+    localStorage.setItem("storytree-page-tags", JSON.stringify(pageTags));
+  }, [cloudMode, pageTags, tags]);
+
+  useEffect(() => {
     function openAi(event: KeyboardEvent) {
       if (
         event.altKey &&
@@ -246,6 +302,10 @@ export function Workspace({
   }, []);
 
   const activePage = pages.find((page) => page.id === activeId) ?? pages[0];
+  const tagTarget =
+    pages.find((page) => page.id === tagTargetId) ?? null;
+  const tagPickerPage =
+    pages.find((page) => page.id === tagPickerTargetId) ?? null;
   const filteredPages = useMemo(() => {
     const query = search.trim().toLowerCase();
     return query
@@ -286,10 +346,107 @@ export function Workspace({
       );
       const page = existing ?? createPage(activeId, title, false);
       applyLink(`#page-${page.id}`);
+      setTagTargetId(page.id);
       setNotice(existing ? `Linked to ${page.title}` : `Created ${page.title}`);
       window.setTimeout(() => setNotice(""), 2200);
+      return { id: page.id, title: page.title };
     },
     [activeId, createPage, pages],
+  );
+
+  const openTagPicker = useCallback(
+    (pageId: string | null) => {
+      if (!pageId || !pages.some((page) => page.id === pageId)) {
+        setNotice(
+          "Create a page link or place the cursor beside one before using /t.",
+        );
+        window.setTimeout(() => setNotice(""), 2800);
+        return;
+      }
+      setTagPickerTargetId(pageId);
+    },
+    [pages],
+  );
+
+  const togglePageTag = useCallback(
+    async (pageId: string, tagId: string) => {
+      const assigned = pageTags[pageId]?.includes(tagId) ?? false;
+      setPageTags((current) => ({
+        ...current,
+        [pageId]: assigned
+          ? (current[pageId] ?? []).filter((id) => id !== tagId)
+          : [...(current[pageId] ?? []), tagId],
+      }));
+
+      if (!cloudMode) return;
+      const supabase = createClient();
+      const { error } = assigned
+        ? await supabase
+            .from("page_tags")
+            .delete()
+            .eq("page_id", pageId)
+            .eq("tag_id", tagId)
+        : await supabase
+            .from("page_tags")
+            .insert({ page_id: pageId, tag_id: tagId });
+      if (error) {
+        setPageTags((current) => ({
+          ...current,
+          [pageId]: assigned
+            ? [...(current[pageId] ?? []), tagId]
+            : (current[pageId] ?? []).filter((id) => id !== tagId),
+        }));
+        setNotice("That tag change could not be saved.");
+        window.setTimeout(() => setNotice(""), 2200);
+      }
+    },
+    [cloudMode, pageTags],
+  );
+
+  const createAndAssignTag = useCallback(
+    async (pageId: string, requestedName: string) => {
+      const name = requestedName.trim().replace(/\s+/g, " ").slice(0, 40);
+      if (!name) return;
+      let tag = tags.find(
+        (candidate) => candidate.name.toLowerCase() === name.toLowerCase(),
+      );
+
+      if (!tag) {
+        if (cloudMode && workspaceId && userId) {
+          const { data, error } = await createClient()
+            .from("tags")
+            .insert({
+              workspace_id: workspaceId,
+              name,
+              created_by: userId,
+            })
+            .select("id,name")
+            .single();
+          if (error || !data) {
+            setNotice(
+              error?.code === "23505"
+                ? "That tag already exists. Reopen the picker to select it."
+                : "The new tag could not be saved.",
+            );
+            window.setTimeout(() => setNotice(""), 2600);
+            return;
+          }
+          tag = data;
+        } else {
+          tag = { id: makeId(), name };
+        }
+        setTags((current) =>
+          [...current, tag as StoryTag].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
+        );
+      }
+
+      if (!(pageTags[pageId] ?? []).includes(tag.id)) {
+        await togglePageTag(pageId, tag.id);
+      }
+    },
+    [cloudMode, pageTags, tags, togglePageTag, userId, workspaceId],
   );
 
   const updateActivePage = useCallback(
@@ -359,6 +516,11 @@ export function Workspace({
         ];
       }
       setPages(remaining);
+      setPageTags((current) => {
+        const next = { ...current };
+        deletedIds.forEach((deletedId) => delete next[deletedId]);
+        return next;
+      });
       if (deletedIds.has(activeId)) {
         const parent = remaining.find((page) => page.id === target.parentId);
         setActiveId(parent?.id ?? remaining[0].id);
@@ -401,6 +563,34 @@ export function Workspace({
       localStorage.setItem(
         "grove-sidebar-width",
         String(sidebarWidthRef.current),
+      );
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  }
+
+  function setTagPanelSize(height: number) {
+    const next = Math.min(360, Math.max(112, height));
+    tagPanelHeightRef.current = next;
+    setTagPanelHeight(next);
+  }
+
+  function startTagPanelResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = tagPanelHeightRef.current;
+    document.body.classList.add("resizing-tag-panel");
+
+    const move = (moveEvent: PointerEvent) => {
+      setTagPanelSize(startHeight + startY - moveEvent.clientY);
+    };
+    const stop = () => {
+      document.body.classList.remove("resizing-tag-panel");
+      localStorage.setItem(
+        "grove-tag-panel-height",
+        String(tagPanelHeightRef.current),
       );
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
@@ -474,6 +664,8 @@ export function Workspace({
               expanded={expanded}
               onSelect={(id) => {
                 setActiveId(id);
+                setTagTargetId(null);
+                setTagPickerTargetId(null);
                 setPages((current) =>
                   current.map((page) =>
                     page.id === id && page.unvisited
@@ -495,6 +687,83 @@ export function Workspace({
               onDelete={deletePage}
             />
           </nav>
+
+          {tagsOpen && (
+            <div
+              className="tag-panel-resizer"
+              role="separator"
+              aria-label="Resize pages and tags lists"
+              aria-orientation="horizontal"
+              aria-valuemin={112}
+              aria-valuemax={360}
+              aria-valuenow={tagPanelHeight}
+              tabIndex={0}
+              onPointerDown={startTagPanelResize}
+              onDoubleClick={() => {
+                setTagPanelSize(180);
+                localStorage.setItem("grove-tag-panel-height", "180");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setTagPanelSize(tagPanelHeight + 16);
+                } else if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  setTagPanelSize(tagPanelHeight - 16);
+                } else if (event.key === "Home") {
+                  event.preventDefault();
+                  setTagPanelSize(112);
+                } else if (event.key === "End") {
+                  event.preventDefault();
+                  setTagPanelSize(360);
+                } else {
+                  return;
+                }
+                localStorage.setItem(
+                  "grove-tag-panel-height",
+                  String(tagPanelHeightRef.current),
+                );
+              }}
+            />
+          )}
+          <section
+            className={`sidebar-tags ${tagsOpen ? "open" : "collapsed"}`}
+            style={tagsOpen ? { height: tagPanelHeight } : undefined}
+          >
+            <button
+              type="button"
+              className="tag-section-heading"
+              aria-expanded={tagsOpen}
+              onClick={() => setTagsOpen((current) => !current)}
+            >
+              {tagsOpen ? (
+                <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
+              )}
+              <Tag size={14} />
+              <span>Tags</span>
+              <small>{tags.length}</small>
+            </button>
+            {tagsOpen && (
+              <div className="sidebar-tag-list" aria-label="Project tags">
+                {tags.map((tag) => {
+                  const usageCount = Object.values(pageTags).filter(
+                    (assignedTags) => assignedTags.includes(tag.id),
+                  ).length;
+                  return (
+                    <div className="sidebar-tag-row" key={tag.id}>
+                      <span>{tag.name}</span>
+                      <small>{usageCount}</small>
+                    </div>
+                  );
+                })}
+                {tags.length === 0 && (
+                  <p>Create a page tag to see it here.</p>
+                )}
+              </div>
+            )}
+          </section>
 
           <div className="sidebar-footer">
             <button
@@ -663,20 +932,60 @@ export function Workspace({
               <span>•</span>
               <span>Edited just now</span>
             </div>
-            <input
-              className="document-title"
-              value={activePage.title}
-              onChange={(event) =>
-                updateActivePage({ title: event.target.value })
-              }
-              aria-label="Page title"
-            />
+            <div className="document-title-row">
+              <input
+                className="document-title"
+                value={activePage.title}
+                onChange={(event) =>
+                  updateActivePage({ title: event.target.value })
+                }
+                aria-label="Page title"
+              />
+              <button
+                type="button"
+                className="title-tag-button"
+                title="Tag this page"
+                aria-label={`Tag ${activePage.title || "this page"}`}
+                onClick={() => {
+                  setTagTargetId(activePage.id);
+                  setTagPickerTargetId(activePage.id);
+                }}
+              >
+                <Tag size={16} />
+              </button>
+            </div>
+            {(pageTags[activePage.id] ?? []).length > 0 && (
+              <div className="page-tag-list" aria-label="Page tags">
+                {(pageTags[activePage.id] ?? []).map((tagId) => {
+                  const tag = tags.find((candidate) => candidate.id === tagId);
+                  return tag ? (
+                    <button
+                      type="button"
+                      key={tag.id}
+                      onClick={() => {
+                        setTagTargetId(activePage.id);
+                        setTagPickerTargetId(activePage.id);
+                      }}
+                    >
+                      {tag.name}
+                    </button>
+                  ) : null;
+                })}
+              </div>
+            )}
             <StoryEditor
               key={activePage.id}
               content={activePage.content}
               onChange={(content) => updateActivePage({ content })}
               onCreatePage={createLinkedPage}
               onOpenAi={openAi}
+              tagTarget={
+                tagTarget
+                  ? { id: tagTarget.id, title: tagTarget.title }
+                  : null
+              }
+              onTagTargetChange={setTagTargetId}
+              onOpenTags={openTagPicker}
             />
           </article>
         )}
@@ -744,6 +1053,19 @@ export function Workspace({
             setNotice("AI settings saved");
             window.setTimeout(() => setNotice(""), 2200);
           }}
+        />
+      )}
+
+      {tagPickerPage && (
+        <TagPicker
+          page={tagPickerPage}
+          tags={tags}
+          selectedTagIds={pageTags[tagPickerPage.id] ?? []}
+          onToggle={(tagId) => void togglePageTag(tagPickerPage.id, tagId)}
+          onCreate={(name) =>
+            void createAndAssignTag(tagPickerPage.id, name)
+          }
+          onClose={() => setTagPickerTargetId(null)}
         />
       )}
 
@@ -851,6 +1173,121 @@ function PageBranch({
         </div>
       );
     });
+}
+
+function TagPicker({
+  page,
+  tags,
+  selectedTagIds,
+  onToggle,
+  onCreate,
+  onClose,
+}: {
+  page: StoryPage;
+  tags: StoryTag[];
+  selectedTagIds: string[];
+  onToggle: (tagId: string) => void;
+  onCreate: (name: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const cleanQuery = query.trim().replace(/\s+/g, " ");
+  const exactTag = tags.find(
+    (tag) => tag.name.toLowerCase() === cleanQuery.toLowerCase(),
+  );
+  const filteredTags = tags.filter((tag) =>
+    tag.name.toLowerCase().includes(cleanQuery.toLowerCase()),
+  );
+
+  return (
+    <div className="dialog-backdrop tag-dialog-backdrop" role="presentation">
+      <section
+        className="tag-picker"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tag-picker-title"
+      >
+        <header>
+          <div>
+            <span className="eyebrow">TAGGING PAGE</span>
+            <h2 id="tag-picker-title">{page.title || "Untitled"}</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close tag picker"
+            onClick={onClose}
+          >
+            <X size={17} />
+          </button>
+        </header>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!cleanQuery) return;
+            if (exactTag) {
+              if (!selectedTagIds.includes(exactTag.id)) {
+                onToggle(exactTag.id);
+              }
+            } else {
+              onCreate(cleanQuery);
+            }
+            setQuery("");
+          }}
+        >
+          <Tag size={15} />
+          <input
+            autoFocus
+            value={query}
+            maxLength={40}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Find or create a tag…"
+            aria-label="Find or create a tag"
+          />
+        </form>
+        <div className="tag-picker-options">
+          {filteredTags.map((tag) => {
+            const selected = selectedTagIds.includes(tag.id);
+            return (
+              <button
+                type="button"
+                key={tag.id}
+                className={selected ? "selected" : ""}
+                onClick={() => onToggle(tag.id)}
+              >
+                <span className="tag-option-mark">
+                  {selected ? <Check size={13} /> : <Tag size={12} />}
+                </span>
+                <span>{tag.name}</span>
+              </button>
+            );
+          })}
+          {cleanQuery && !exactTag && (
+            <button
+              type="button"
+              className="create-tag-option"
+              onClick={() => {
+                onCreate(cleanQuery);
+                setQuery("");
+              }}
+            >
+              <span className="tag-option-mark">
+                <Plus size={13} />
+              </span>
+              <span>Create “{cleanQuery}”</span>
+            </button>
+          )}
+          {!cleanQuery && tags.length === 0 && (
+            <p>No tags yet. Type a name to create the first one.</p>
+          )}
+        </div>
+        <footer>
+          <span>Project tags are available on every page.</span>
+          <kbd>Enter</kbd>
+        </footer>
+      </section>
+    </div>
+  );
 }
 
 function AiPanel({

@@ -33,7 +33,8 @@ Supabase is not required for the local vertical slice. When ready:
 4. Generate `AI_KEY_ENCRYPTION_SECRET` with `openssl rand -base64 32`.
 5. Apply the SQL files in `supabase/migrations` in numeric order, or link the
    Supabase CLI and run `supabase db push`. Migration `006` creates the private
-   `workspace-covers` bucket and project-creation function.
+   `workspace-covers` bucket and project-creation function. Migration `007`
+   adds project-specific page tags.
 
 Do not expose the database password, service-role key, or encryption secret in
 the browser. The migration enables row-level security and provisions one

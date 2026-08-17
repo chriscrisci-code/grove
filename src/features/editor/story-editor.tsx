@@ -14,6 +14,7 @@ import {
   Mic,
   MicOff,
   Quote,
+  Tag,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -62,8 +63,14 @@ const StoryLink = Link.extend({
 type StoryEditorProps = {
   content: string;
   onChange: (html: string) => void;
-  onCreatePage: (title: string, linkSelection: (href: string) => void) => void;
+  onCreatePage: (
+    title: string,
+    linkSelection: (href: string) => void,
+  ) => { id: string; title: string };
   onOpenAi: (selection: string) => void;
+  tagTarget: { id: string; title: string } | null;
+  onTagTargetChange: (pageId: string | null) => void;
+  onOpenTags: (pageId: string | null) => void;
 };
 
 export function StoryEditor({
@@ -71,6 +78,9 @@ export function StoryEditor({
   onChange,
   onCreatePage,
   onOpenAi,
+  tagTarget,
+  onTagTargetChange,
+  onOpenTags,
 }: StoryEditorProps) {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -99,6 +109,19 @@ export function StoryEditor({
       },
     },
     onUpdate: ({ editor: currentEditor }) => onChange(currentEditor.getHTML()),
+    onSelectionUpdate: ({ editor: currentEditor, transaction }) => {
+      if (transaction.docChanged) return;
+      const { $from } = currentEditor.state.selection;
+      const nearbyMarks = [
+        ...$from.marks(),
+        ...($from.nodeBefore?.marks ?? []),
+        ...($from.nodeAfter?.marks ?? []),
+      ];
+      const href = nearbyMarks.find((mark) => mark.type.name === "link")?.attrs
+        .href as string | undefined;
+      const match = href?.match(/^#page-(.+)$/);
+      onTagTargetChange(match?.[1] ?? null);
+    },
   });
 
   useEffect(() => {
@@ -165,7 +188,7 @@ export function StoryEditor({
         linkTo = $from.pos;
       }
 
-      onCreatePage(title, (href) => {
+      const linkedPage = onCreatePage(title, (href) => {
         const chain = editor.chain().focus();
         if (removeFrom !== null) {
           chain.deleteRange({ from: removeFrom, to });
@@ -176,9 +199,34 @@ export function StoryEditor({
           .setTextSelection(linkTo)
           .run();
       });
+      onTagTargetChange(linkedPage.id);
       return true;
     },
-    [editor, onCreatePage],
+    [editor, onCreatePage, onTagTargetChange],
+  );
+
+  const openTagCommand = useCallback(
+    (removeSlashCommand = false) => {
+      if (!editor) return false;
+      if (removeSlashCommand) {
+        const { from, to, $from } = editor.state.selection;
+        if (from !== to) return false;
+        const beforeCaret = $from.parent.textBetween(
+          0,
+          $from.parentOffset,
+          " ",
+        );
+        if (!/\/t$/u.test(beforeCaret)) return false;
+        editor
+          .chain()
+          .focus()
+          .deleteRange({ from: $from.pos - 2, to: $from.pos })
+          .run();
+      }
+      onOpenTags(tagTarget?.id ?? null);
+      return true;
+    },
+    [editor, onOpenTags, tagTarget?.id],
   );
 
   useEffect(() => {
@@ -187,6 +235,16 @@ export function StoryEditor({
 
       const noModifiers =
         !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+      if (
+        editor.isFocused &&
+        noModifiers &&
+        !event.isComposing &&
+        (event.key === "Enter" || event.key === " ") &&
+        openTagCommand(true)
+      ) {
+        event.preventDefault();
+        return;
+      }
       if (
         editor.isFocused &&
         noModifiers &&
@@ -207,6 +265,12 @@ export function StoryEditor({
         return;
       }
 
+      if (event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        openTagCommand();
+        return;
+      }
+
       if (event.key.toLowerCase() !== "p") return;
       event.preventDefault();
       createPageFromEditorText();
@@ -214,7 +278,7 @@ export function StoryEditor({
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [createPageFromEditorText, editor, onOpenAi]);
+  }, [createPageFromEditorText, editor, onOpenAi, openTagCommand]);
 
   if (!editor) return <div className="editor-loading">Opening your page…</div>;
   const dictationEditor = editor;
@@ -379,6 +443,25 @@ export function StoryEditor({
         </button>
         <button
           type="button"
+          className="tag-create-button"
+          title={
+            tagTarget
+              ? `Tag ${tagTarget.title}`
+              : "Tag the most recently linked page"
+          }
+          aria-label={
+            tagTarget
+              ? `Tag ${tagTarget.title}`
+              : "Tag the most recently linked page"
+          }
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => openTagCommand()}
+        >
+          <Tag size={16} />
+          <span>Tag</span>
+        </button>
+        <button
+          type="button"
           className={`dictation-button ${listening ? "listening" : ""}`}
           title={
             speechSupported
@@ -395,6 +478,11 @@ export function StoryEditor({
           {listening ? <MicOff size={16} /> : <Mic size={16} />}
           <span>{listening ? "Stop" : "Dictate"}</span>
         </button>
+        {tagTarget && (
+          <span className="tag-target-indicator" title="Current tag target">
+            Tag target: {tagTarget.title}
+          </span>
+        )}
       </div>
       {dictationStatus && (
         <div

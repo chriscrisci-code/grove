@@ -1,5 +1,9 @@
 import { notFound, redirect } from "next/navigation";
-import { Workspace, type StoryPage } from "@/features/workspace/workspace";
+import {
+  Workspace,
+  type StoryPage,
+  type StoryTag,
+} from "@/features/workspace/workspace";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function WorkspacePage({
@@ -47,9 +51,40 @@ export default async function WorkspacePage({
     };
   });
 
+  const [{ data: tagRows }, { data: pageTagRows }] = await Promise.all([
+    supabase
+      .from("tags")
+      .select("id,name")
+      .eq("workspace_id", workspace.id)
+      .order("name"),
+    pages.length
+      ? supabase
+          .from("page_tags")
+          .select("page_id,tag_id")
+          .in(
+            "page_id",
+            pages.map((page) => page.id),
+          )
+      : Promise.resolve({ data: [] }),
+  ]);
+  const tags: StoryTag[] = (tagRows ?? []).map((tag) => ({
+    id: tag.id,
+    name: tag.name,
+  }));
+  const pageTags = (pageTagRows ?? []).reduce<Record<string, string[]>>(
+    (assignments, assignment) => {
+      assignments[assignment.page_id] ??= [];
+      assignments[assignment.page_id].push(assignment.tag_id);
+      return assignments;
+    },
+    {},
+  );
+
   return (
     <Workspace
       initialCloudPages={pages}
+      initialTags={tags}
+      initialPageTags={pageTags}
       workspaceId={workspace.id}
       workspaceName={workspace.name}
       userId={user.id}

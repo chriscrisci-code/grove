@@ -4,6 +4,11 @@ import {
   type StoryPage,
   type StoryTag,
 } from "@/features/workspace/workspace";
+import {
+  normalizePageFields,
+  normalizePageType,
+  type StoryRelationship,
+} from "@/features/workspace/page-types";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function WorkspacePage({
@@ -27,7 +32,7 @@ export default async function WorkspacePage({
 
   const { data: rows } = await supabase
     .from("pages")
-    .select("id,parent_id,title,content,updated_at")
+    .select("id,parent_id,title,content,updated_at,page_type,fields")
     .eq("workspace_id", workspace.id)
     .is("deleted_at", null)
     .order("position");
@@ -47,26 +52,33 @@ export default async function WorkspacePage({
           : content?.html || "<p>Begin writing your story…</p>",
       unvisited:
         typeof content === "object" && content?.unvisited === true,
+      pageType: normalizePageType(page.page_type),
+      fields: normalizePageFields(page.fields),
       updatedAt: new Date(page.updated_at).getTime(),
     };
   });
 
-  const [{ data: tagRows }, { data: pageTagRows }] = await Promise.all([
-    supabase
-      .from("tags")
-      .select("id,name")
-      .eq("workspace_id", workspace.id)
-      .order("name"),
-    pages.length
-      ? supabase
-          .from("page_tags")
-          .select("page_id,tag_id")
-          .in(
-            "page_id",
-            pages.map((page) => page.id),
-          )
-      : Promise.resolve({ data: [] }),
-  ]);
+  const [{ data: tagRows }, { data: pageTagRows }, { data: relationshipRows }] =
+    await Promise.all([
+      supabase
+        .from("tags")
+        .select("id,name")
+        .eq("workspace_id", workspace.id)
+        .order("name"),
+      pages.length
+        ? supabase
+            .from("page_tags")
+            .select("page_id,tag_id")
+            .in(
+              "page_id",
+              pages.map((page) => page.id),
+            )
+        : Promise.resolve({ data: [] }),
+      supabase
+        .from("page_relationships")
+        .select("id,from_page_id,to_page_id,label")
+        .eq("workspace_id", workspace.id),
+    ]);
   const tags: StoryTag[] = (tagRows ?? []).map((tag) => ({
     id: tag.id,
     name: tag.name,
@@ -79,12 +91,21 @@ export default async function WorkspacePage({
     },
     {},
   );
+  const initialRelationships: StoryRelationship[] = (
+    relationshipRows ?? []
+  ).map((item) => ({
+    id: item.id,
+    fromPageId: item.from_page_id,
+    toPageId: item.to_page_id,
+    label: item.label,
+  }));
 
   return (
     <Workspace
       initialCloudPages={pages}
       initialTags={tags}
       initialPageTags={pageTags}
+      initialRelationships={initialRelationships}
       workspaceId={workspace.id}
       workspaceName={workspace.name}
       userId={user.id}

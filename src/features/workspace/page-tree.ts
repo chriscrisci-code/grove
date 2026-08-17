@@ -97,3 +97,60 @@ export function applyPageDrop<T extends TreePage>(
   emitSiblings();
   return result;
 }
+
+export function reorderAmong<T extends { id: string }>(
+  pages: T[],
+  inGroup: (page: T) => boolean,
+  draggedId: string,
+  beforeId: string | null,
+): T[] {
+  const dragged = pages.find((page) => page.id === draggedId);
+  if (!dragged || !inGroup(dragged)) return pages;
+  const remaining = pages.filter((page) => page.id !== draggedId);
+  const groupIds = remaining.filter(inGroup).map((page) => page.id);
+  const nextIds = [...groupIds];
+  const insertIndex = beforeId ? nextIds.indexOf(beforeId) : -1;
+  if (insertIndex >= 0) nextIds.splice(insertIndex, 0, draggedId);
+  else nextIds.push(draggedId);
+
+  const byId = new Map(pages.map((page) => [page.id, page]));
+  const result: T[] = [];
+  let emitted = false;
+  const emitGroup = () => {
+    if (emitted) return;
+    emitted = true;
+    for (const id of nextIds) {
+      const page = byId.get(id);
+      if (page) result.push(page);
+    }
+  };
+  for (const page of remaining) {
+    if (inGroup(page)) {
+      emitGroup();
+      continue;
+    }
+    result.push(page);
+  }
+  emitGroup();
+  return result;
+}
+
+export function applyPageTypeChange<
+  T extends { id: string; parentId: string | null; pageType: string },
+>(pages: T[], pageId: string, pageType: string): T[] {
+  return pages.map((page) => {
+    if (page.id === pageId) {
+      const leavingOrEnteringChapter =
+        pageType === "chapter" || page.pageType === "chapter";
+      return {
+        ...page,
+        pageType,
+        parentId: leavingOrEnteringChapter ? null : page.parentId,
+      };
+    }
+    if (pageType === "chapter" && page.parentId === pageId) {
+      return { ...page, parentId: null };
+    }
+    return page;
+  });
+}

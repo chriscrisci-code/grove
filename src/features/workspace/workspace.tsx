@@ -8,12 +8,14 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  GitFork,
   GripVertical,
   LibraryBig,
   LogOut,
   Menu,
   PanelLeftClose,
   Plus,
+  Printer,
   Search,
   Settings,
   Sparkles,
@@ -32,19 +34,35 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { StoryEditor } from "@/features/editor/story-editor";
+import { RelationshipWeb } from "@/features/relationships/relationship-web";
 import { ResearchView } from "@/features/research/research-view";
+import { ManuscriptPreview } from "@/features/workspace/manuscript-preview";
 import { createClient } from "@/lib/supabase/client";
 import {
   applyPageDrop,
+  applyPageTypeChange,
   dropPlacementFromOffset,
+  reorderAmong,
   type PageDrop,
 } from "@/features/workspace/page-tree";
+import {
+  PAGE_TYPE_FIELDS,
+  PAGE_TYPE_LABELS,
+  PAGE_TYPES,
+  RELATIONSHIP_SUGGESTIONS,
+  normalizePageFields,
+  normalizePageType,
+  type PageType,
+  type StoryRelationship,
+} from "@/features/workspace/page-types";
 
 export type StoryPage = {
   id: string;
   parentId: string | null;
   title: string;
   content: string;
+  pageType: PageType;
+  fields: Record<string, string>;
   unvisited: boolean;
   updatedAt: number;
 };
@@ -64,6 +82,8 @@ const initialPages: StoryPage[] = [
     content:
       "<p>Your story begins here. Grove keeps every character, place, and idea within reach.</p><h2>Try a quick link</h2><p>Type a name like <strong>Evermere</strong>, place your cursor after it, and press <strong>Alt+P</strong>. A linked child page will appear instantly.</p><p>Press <strong>Alt+A</strong> whenever you want to think alongside AI.</p>",
     unvisited: false,
+    pageType: "page",
+    fields: {},
     updatedAt: Date.now(),
   },
   {
@@ -72,6 +92,8 @@ const initialPages: StoryPage[] = [
     title: "Characters",
     content: "<p>Keep the people at the heart of your story here.</p>",
     unvisited: false,
+    pageType: "page",
+    fields: {},
     updatedAt: Date.now() - 1000,
   },
   {
@@ -81,6 +103,8 @@ const initialPages: StoryPage[] = [
     content:
       "<h2>Role</h2><p>Protagonist</p><h2>Wants</h2><p>To discover what happened beyond the northern ridge.</p>",
     unvisited: false,
+    pageType: "character",
+    fields: { role: "Protagonist", wants: "To discover what happened beyond the northern ridge." },
     updatedAt: Date.now() - 2000,
   },
   {
@@ -89,6 +113,8 @@ const initialPages: StoryPage[] = [
     title: "Places",
     content: "<p>Map the places that shape your world.</p>",
     unvisited: false,
+    pageType: "page",
+    fields: {},
     updatedAt: Date.now() - 3000,
   },
 ];
@@ -101,6 +127,7 @@ type WorkspaceProps = {
   initialCloudPages?: StoryPage[];
   initialTags?: StoryTag[];
   initialPageTags?: Record<string, string[]>;
+  initialRelationships?: StoryRelationship[];
   workspaceId?: string;
   workspaceName?: string;
   userId?: string;
@@ -111,6 +138,7 @@ export function Workspace({
   initialCloudPages,
   initialTags = [],
   initialPageTags = {},
+  initialRelationships = [],
   workspaceId,
   workspaceName = "My Story",
   userId,
@@ -124,10 +152,18 @@ export function Workspace({
   const [tags, setTags] = useState(initialTags);
   const [pageTags, setPageTags] =
     useState<Record<string, string[]>>(initialPageTags);
+  const [relationships, setRelationships] = useState(initialRelationships);
   const [tagTargetId, setTagTargetId] = useState<string | null>(null);
   const [tagPickerTargetId, setTagPickerTargetId] = useState<string | null>(
     null,
   );
+  const [relatePicker, setRelatePicker] = useState<{
+    fromId: string;
+    toId?: string;
+  } | null>(null);
+  const [chaptersOpen, setChaptersOpen] = useState(true);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [relationshipsOpen, setRelationshipsOpen] = useState(false);
   const [activeId, setActiveId] = useState(startingPages[0]?.id ?? "welcome");
   const [expanded, setExpanded] = useState<Set<string>>(
     new Set(["characters"]),
@@ -215,11 +251,22 @@ export function Workspace({
     const storedModel = localStorage.getItem("storytree-ai-model");
     const storedTags = localStorage.getItem("storytree-tags");
     const storedPageTags = localStorage.getItem("storytree-page-tags");
+    const storedRelationships = localStorage.getItem("storytree-relationships");
     queueMicrotask(() => {
       if (raw) {
         try {
-          const restored = JSON.parse(raw) as StoryPage[];
-          if (restored.length) setPages(restored);
+          const restored = JSON.parse(raw) as Array<
+            StoryPage & { pageType?: string; fields?: unknown }
+          >;
+          if (restored.length) {
+            setPages(
+              restored.map((page) => ({
+                ...page,
+                pageType: normalizePageType(page.pageType),
+                fields: normalizePageFields(page.fields),
+              })),
+            );
+          }
         } catch {
           localStorage.removeItem("storytree-pages");
         }
@@ -245,6 +292,13 @@ export function Workspace({
           setPageTags(JSON.parse(storedPageTags) as Record<string, string[]>);
         } catch {
           localStorage.removeItem("storytree-page-tags");
+        }
+      }
+      if (storedRelationships) {
+        try {
+          setRelationships(JSON.parse(storedRelationships) as StoryRelationship[]);
+        } catch {
+          localStorage.removeItem("storytree-relationships");
         }
       }
     });
@@ -281,6 +335,8 @@ export function Workspace({
               parent_id: page.parentId,
               title: page.title || "Untitled",
               content: { html: page.content, unvisited: page.unvisited },
+              page_type: page.pageType,
+              fields: page.fields,
               position,
               created_by: userId,
             })),
@@ -303,7 +359,11 @@ export function Workspace({
     if (cloudMode) return;
     localStorage.setItem("storytree-tags", JSON.stringify(tags));
     localStorage.setItem("storytree-page-tags", JSON.stringify(pageTags));
-  }, [cloudMode, pageTags, tags]);
+    localStorage.setItem(
+      "storytree-relationships",
+      JSON.stringify(relationships),
+    );
+  }, [cloudMode, pageTags, relationships, tags]);
 
   useEffect(() => {
     function openAi(event: KeyboardEvent) {
@@ -333,22 +393,45 @@ export function Workspace({
       ? pages.filter((page) => page.title.toLowerCase().includes(query))
       : pages;
   }, [pages, search]);
+  const storyPages = useMemo(
+    () => filteredPages.filter((page) => page.pageType !== "chapter"),
+    [filteredPages],
+  );
+  const chapterPages = useMemo(() => {
+    const chapters = pages.filter((page) => page.pageType === "chapter");
+    const query = search.trim().toLowerCase();
+    return query
+      ? chapters.filter((page) => page.title.toLowerCase().includes(query))
+      : chapters;
+  }, [pages, search]);
+  const activeRelations = useMemo(
+    () =>
+      relationships.filter(
+        (item) =>
+          item.fromPageId === activeId || item.toPageId === activeId,
+      ),
+    [activeId, relationships],
+  );
 
   const createPage = useCallback(
     (
       parentId: string | null = null,
       title = "Untitled",
       activate = true,
+      pageType: PageType = "page",
     ) => {
       const page: StoryPage = {
         id: makeId(),
-        parentId,
+        parentId: pageType === "chapter" ? null : parentId,
         title,
         content: "<p></p>",
+        pageType,
+        fields: {},
         unvisited: !activate,
         updatedAt: Date.now(),
       };
       setPages((current) => [...current, page]);
+      if (pageType === "chapter") setChaptersOpen(true);
       if (parentId) {
         setExpanded((current) => new Set(current).add(parentId));
       }
@@ -457,6 +540,102 @@ export function Workspace({
       if (drag.started && drop) movePage(pageId, drop);
     },
     [movePage],
+  );
+
+  const moveChapter = useCallback(
+    (draggedId: string, drop: { type: "before" | "after"; targetId: string }) => {
+      setPages((current) => {
+        const remainingChapters = current.filter(
+          (page) => page.pageType === "chapter" && page.id !== draggedId,
+        );
+        const targetIndex = remainingChapters.findIndex(
+          (page) => page.id === drop.targetId,
+        );
+        const beforeId =
+          drop.type === "before"
+            ? drop.targetId
+            : remainingChapters[targetIndex + 1]?.id ?? null;
+        return reorderAmong(
+          current,
+          (page) => page.pageType === "chapter",
+          draggedId,
+          beforeId,
+        ).map((page) =>
+          page.id === draggedId ? { ...page, updatedAt: Date.now() } : page,
+        );
+      });
+    },
+    [],
+  );
+
+  const startChapterDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>, pageId: string) => {
+      if (search.trim() || sidebarWidth < 112) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      pageDragRef.current = {
+        pointerId: event.pointerId,
+        pageId,
+        started: false,
+        startX: event.clientX,
+        startY: event.clientY,
+        drop: null,
+      };
+    },
+    [search, sidebarWidth],
+  );
+
+  const updateChapterDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const drag = pageDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (!drag.started) {
+        if (
+          Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) <
+          6
+        ) {
+          return;
+        }
+        drag.started = true;
+        setDraggingId(drag.pageId);
+        document.body.classList.add("dragging-pages");
+      }
+      const node = document.elementFromPoint(event.clientX, event.clientY);
+      const row = node?.closest<HTMLElement>("[data-chapter-id]");
+      const targetId = row?.dataset.chapterId;
+      if (!row || !targetId || targetId === drag.pageId) {
+        drag.drop = null;
+        setDropTarget(null);
+        return;
+      }
+      const rect = row.getBoundingClientRect();
+      const drop: PageDrop = {
+        type:
+          (event.clientY - rect.top) / rect.height < 0.5 ? "before" : "after",
+        targetId,
+      };
+      drag.drop = drop;
+      setDropTarget(drop);
+    },
+    [],
+  );
+
+  const finishChapterDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const drag = pageDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      pageDragRef.current = null;
+      document.body.classList.remove("dragging-pages");
+      const drop = drag.drop;
+      const pageId = drag.pageId;
+      setDraggingId(null);
+      setDropTarget(null);
+      if (drag.started && drop && drop.type !== "inside") {
+        moveChapter(pageId, { type: drop.type, targetId: drop.targetId });
+      }
+    },
+    [moveChapter],
   );
 
   const createLinkedPage = useCallback(
@@ -574,7 +753,11 @@ export function Workspace({
   );
 
   const updateActivePage = useCallback(
-    (patch: Partial<Pick<StoryPage, "title" | "content">>) => {
+    (
+      patch: Partial<
+        Pick<StoryPage, "title" | "content" | "pageType" | "fields">
+      >,
+    ) => {
       setPages((current) =>
         current.map((page) =>
           page.id === activeId
@@ -584,6 +767,111 @@ export function Workspace({
       );
     },
     [activeId],
+  );
+
+  const changePageType = useCallback((pageId: string, pageType: PageType) => {
+    setPages((current) =>
+      applyPageTypeChange(current, pageId, pageType).map((page) =>
+        page.id === pageId || page.parentId === null
+          ? { ...page, updatedAt: Date.now() }
+          : page,
+      ),
+    );
+    if (pageType === "chapter") setChaptersOpen(true);
+  }, []);
+
+  const openRelatePicker = useCallback(
+    (pageId: string | null) => {
+      if (!pageId || !pages.some((page) => page.id === pageId)) {
+        setNotice(
+          "Create a page link or place the cursor beside one before using /r.",
+        );
+        window.setTimeout(() => setNotice(""), 2800);
+        return;
+      }
+      if (pageId === activeId) {
+        setRelatePicker({ fromId: pageId });
+        return;
+      }
+      setRelatePicker({ fromId: activeId, toId: pageId });
+    },
+    [activeId, pages],
+  );
+
+  const createRelationship = useCallback(
+    async (fromPageId: string, toPageId: string, requestedLabel: string) => {
+      const label = requestedLabel.trim().replace(/\s+/g, " ").slice(0, 40);
+      if (!label || fromPageId === toPageId) return;
+      const duplicate = relationships.some(
+        (item) =>
+          item.fromPageId === fromPageId &&
+          item.toPageId === toPageId &&
+          item.label.toLowerCase() === label.toLowerCase(),
+      );
+      if (duplicate) {
+        setNotice("That relationship already exists.");
+        window.setTimeout(() => setNotice(""), 2200);
+        return;
+      }
+      const relationship: StoryRelationship = {
+        id: makeId(),
+        fromPageId,
+        toPageId,
+        label,
+      };
+      setRelationships((current) => [...current, relationship]);
+      if (cloudMode && workspaceId) {
+        const { data, error } = await createClient()
+          .from("page_relationships")
+          .insert({
+            id: relationship.id,
+            workspace_id: workspaceId,
+            from_page_id: fromPageId,
+            to_page_id: toPageId,
+            label,
+          })
+          .select("id")
+          .single();
+        if (error) {
+          setRelationships((current) =>
+            current.filter((item) => item.id !== relationship.id),
+          );
+          setNotice(
+            error.code === "23505"
+              ? "That relationship already exists."
+              : "The relationship could not be saved.",
+          );
+          window.setTimeout(() => setNotice(""), 2600);
+          return;
+        }
+        if (data?.id && data.id !== relationship.id) {
+          setRelationships((current) =>
+            current.map((item) =>
+              item.id === relationship.id ? { ...item, id: data.id } : item,
+            ),
+          );
+        }
+      }
+      setNotice("Relationship saved");
+      window.setTimeout(() => setNotice(""), 1800);
+    },
+    [cloudMode, relationships, workspaceId],
+  );
+
+  const deleteRelationship = useCallback(
+    async (id: string) => {
+      setRelationships((current) => current.filter((item) => item.id !== id));
+      if (!cloudMode) return;
+      const { error } = await createClient()
+        .from("page_relationships")
+        .delete()
+        .eq("id", id);
+      if (error) {
+        setNotice("That relationship could not be removed.");
+        window.setTimeout(() => setNotice(""), 2200);
+      }
+    },
+    [cloudMode],
   );
 
   const deletePage = useCallback(
@@ -634,6 +922,8 @@ export function Workspace({
             parentId: null,
             title: "Untitled",
             content: "<p></p>",
+            pageType: "page",
+            fields: {},
             unvisited: false,
             updatedAt: Date.now(),
           },
@@ -645,6 +935,12 @@ export function Workspace({
         deletedIds.forEach((deletedId) => delete next[deletedId]);
         return next;
       });
+      setRelationships((current) =>
+        current.filter(
+          (item) =>
+            !deletedIds.has(item.fromPageId) && !deletedIds.has(item.toPageId),
+        ),
+      );
       if (deletedIds.has(activeId)) {
         const parent = remaining.find((page) => page.id === target.parentId);
         setActiveId(parent?.id ?? remaining[0].id);
@@ -799,8 +1095,8 @@ export function Workspace({
               </div>
             )}
             <PageBranch
-              pages={filteredPages}
-              allPages={pages}
+              pages={storyPages}
+              allPages={storyPages}
               parentId={null}
               activeId={activeId}
               expanded={expanded}
@@ -835,6 +1131,128 @@ export function Workspace({
               onDragEnd={finishPageDrag}
             />
           </nav>
+
+          <section
+            className={`sidebar-chapters ${chaptersOpen ? "open" : "collapsed"}`}
+          >
+            <div className="chapter-section-heading">
+              <button
+                type="button"
+                className="tag-section-heading"
+                aria-expanded={chaptersOpen}
+                onClick={() => setChaptersOpen((current) => !current)}
+              >
+                {chaptersOpen ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
+                )}
+                <BookOpen size={14} />
+                <span>Chapters</span>
+                <small>{chapterPages.length}</small>
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Create chapter"
+                title="Create chapter"
+                onClick={() => createPage(null, "Untitled", true, "chapter")}
+              >
+                <Plus size={15} />
+              </button>
+              <button
+                type="button"
+                className="icon-button chapter-export"
+                aria-label="Export manuscript"
+                title="Print chapters as PDF"
+                onClick={() => setExportOpen(true)}
+              >
+                <Printer size={15} />
+              </button>
+            </div>
+            {chaptersOpen && (
+              <nav className="sidebar-chapter-list" aria-label="Chapters">
+                {chapterPages.length === 0 ? (
+                  <p className="sidebar-empty-hint">
+                    Set a page type to Chapter, or add one here.
+                  </p>
+                ) : (
+                  chapterPages.map((page) => (
+                    <div
+                      key={page.id}
+                      data-chapter-id={page.id}
+                      className={`page-row ${
+                        activeId === page.id ? "active" : ""
+                      } ${page.unvisited ? "unvisited" : ""} ${
+                        draggingId === page.id ? "dragging" : ""
+                      } ${
+                        dropTarget?.targetId === page.id
+                          ? `drop-${dropTarget.type}`
+                          : ""
+                      }`}
+                    >
+                      {sidebarMode !== "rail" && !search.trim() && (
+                        <button
+                          type="button"
+                          className="page-drag-handle"
+                          aria-label={`Reorder ${page.title || "Untitled"}`}
+                          title="Drag to set export order"
+                          onPointerDown={(event) =>
+                            startChapterDrag(event, page.id)
+                          }
+                          onPointerMove={updateChapterDrag}
+                          onPointerUp={finishChapterDrag}
+                          onPointerCancel={finishChapterDrag}
+                          onLostPointerCapture={finishChapterDrag}
+                        >
+                          <GripVertical size={13} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="page-name"
+                        data-initial={(page.title || "Untitled")
+                          .charAt(0)
+                          .toUpperCase()}
+                        title={page.title || "Untitled"}
+                        onClick={() => {
+                          setActiveId(page.id);
+                          setTagTargetId(null);
+                          setTagPickerTargetId(null);
+                          setPages((current) =>
+                            current.map((candidate) =>
+                              candidate.id === page.id && candidate.unvisited
+                                ? { ...candidate, unvisited: false }
+                                : candidate,
+                            ),
+                          );
+                          if (isNarrow) setSidebarOpen(false);
+                        }}
+                      >
+                        <BookOpen size={15} />
+                        {page.unvisited && (
+                          <span
+                            className="unvisited-page-dot"
+                            title="New page"
+                          />
+                        )}
+                        <span>{page.title || "Untitled"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="row-delete"
+                        aria-label={`Delete ${page.title}`}
+                        title="Delete chapter"
+                        onClick={() => deletePage(page.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </nav>
+            )}
+          </section>
 
           {tagsOpen && (
             <div
@@ -1083,37 +1501,59 @@ export function Workspace({
                 <strong>Research</strong>
               </>
             )}
+            {relationshipsOpen && (
+              <>
+                <ChevronRight size={14} />
+                <strong>Relationships</strong>
+              </>
+            )}
           </div>
           <div className="topbar-actions">
-            {!researchOpen && (
+            {!researchOpen && !relationshipsOpen && (
               <span className="save-state">
                 {savedAt ? "Saved" : "Saving…"}
               </span>
             )}
-            <button
-              type="button"
-              className={`research-button ${researchOpen ? "active" : ""}`}
-              onClick={() => {
-                setResearchOpen((current) => !current);
-                setAiOpen(false);
-                setSidebarOpen(false);
-              }}
-            >
-              <LibraryBig size={15} />
-              <span>{researchOpen ? "Writing" : "Research"}</span>
-            </button>
+            {!relationshipsOpen && (
+              <button
+                type="button"
+                className={`research-button ${researchOpen ? "active" : ""}`}
+                onClick={() => {
+                  setResearchOpen((current) => !current);
+                  setRelationshipsOpen(false);
+                  setAiOpen(false);
+                  setSidebarOpen(false);
+                }}
+              >
+                <LibraryBig size={15} />
+                <span>{researchOpen ? "Writing" : "Research"}</span>
+              </button>
+            )}
             {!researchOpen && (
-              <>
-            <button
-              type="button"
-              className="ai-button"
-              onClick={() => openAi()}
-            >
-              <Sparkles size={15} />
-              <span>Ask AI</span>
-              <kbd>Alt A</kbd>
-            </button>
-              </>
+              <button
+                type="button"
+                className={`research-button ${relationshipsOpen ? "active" : ""}`}
+                onClick={() => {
+                  setRelationshipsOpen((current) => !current);
+                  setResearchOpen(false);
+                  setAiOpen(false);
+                  setSidebarOpen(false);
+                }}
+              >
+                <GitFork size={15} />
+                <span>{relationshipsOpen ? "Writing" : "Relationships"}</span>
+              </button>
+            )}
+            {!researchOpen && !relationshipsOpen && (
+              <button
+                type="button"
+                className="ai-button"
+                onClick={() => openAi()}
+              >
+                <Sparkles size={15} />
+                <span>Ask AI</span>
+                <kbd>Alt A</kbd>
+              </button>
             )}
           </div>
         </header>
@@ -1127,13 +1567,68 @@ export function Workspace({
             userId={userId}
             onClose={() => setResearchOpen(false)}
           />
+        ) : relationshipsOpen ? (
+          <RelationshipWeb
+            pages={pages}
+            relationships={relationships}
+            onOpenPage={(id) => {
+              setActiveId(id);
+              setRelationshipsOpen(false);
+              setTagTargetId(null);
+              setTagPickerTargetId(null);
+              setPages((current) =>
+                current.map((page) =>
+                  page.id === id && page.unvisited
+                    ? { ...page, unvisited: false }
+                    : page,
+                ),
+              );
+            }}
+            onClose={() => setRelationshipsOpen(false)}
+          />
         ) : (
           <article className="document">
             <div className="document-meta">
-              <span>PAGE</span>
+              <span>{PAGE_TYPE_LABELS[activePage.pageType].toUpperCase()}</span>
               <span>•</span>
               <span>Edited just now</span>
             </div>
+            <label className="page-type-picker">
+              <span>Type</span>
+              <select
+                value={activePage.pageType}
+                aria-label="Page type"
+                onChange={(event) =>
+                  changePageType(activePage.id, event.target.value as PageType)
+                }
+              >
+                {PAGE_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {PAGE_TYPE_LABELS[type]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {PAGE_TYPE_FIELDS[activePage.pageType].length > 0 && (
+              <div className="page-type-fields">
+                {PAGE_TYPE_FIELDS[activePage.pageType].map((field) => (
+                  <label key={field.key}>
+                    <span>{field.label}</span>
+                    <input
+                      value={activePage.fields[field.key] ?? ""}
+                      onChange={(event) =>
+                        updateActivePage({
+                          fields: {
+                            ...activePage.fields,
+                            [field.key]: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
             <div
               className="document-title-row"
               onClick={() => setTagTargetId(activePage.id)}
@@ -1158,6 +1653,18 @@ export function Workspace({
               >
                 <Tag size={16} />
               </button>
+              <button
+                type="button"
+                className="title-tag-button"
+                title="Relate this page"
+                aria-label={`Relate ${activePage.title || "this page"}`}
+                onClick={() => {
+                  setTagTargetId(activePage.id);
+                  setRelatePicker({ fromId: activePage.id });
+                }}
+              >
+                <GitFork size={16} />
+              </button>
             </div>
             {(pageTags[activePage.id] ?? []).length > 0 && (
               <div className="page-tag-list" aria-label="Page tags">
@@ -1178,6 +1685,42 @@ export function Workspace({
                 })}
               </div>
             )}
+            {activeRelations.length > 0 && (
+              <div className="related-chip-list" aria-label="Related pages">
+                {activeRelations.map((item) => {
+                  const otherId =
+                    item.fromPageId === activePage.id
+                      ? item.toPageId
+                      : item.fromPageId;
+                  const other = pages.find((page) => page.id === otherId);
+                  const outgoing = item.fromPageId === activePage.id;
+                  return (
+                    <span key={item.id} className="related-chip">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveId(otherId);
+                          setTagTargetId(null);
+                          setTagPickerTargetId(null);
+                        }}
+                      >
+                        {outgoing
+                          ? `${item.label} → ${other?.title || "Untitled"}`
+                          : `${other?.title || "Untitled"} → ${item.label}`}
+                      </button>
+                      <button
+                        type="button"
+                        className="related-chip-remove"
+                        aria-label="Remove relationship"
+                        onClick={() => void deleteRelationship(item.id)}
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <StoryEditor
               key={activePage.id}
               content={activePage.content}
@@ -1191,6 +1734,7 @@ export function Workspace({
               }
               onTagTargetChange={setTagTargetId}
               onOpenTags={openTagPicker}
+              onOpenRelate={openRelatePicker}
               onNavigatePage={(id) => {
                 if (!pages.some((page) => page.id === id)) return;
                 setActiveId(id);
@@ -1284,6 +1828,37 @@ export function Workspace({
             void createAndAssignTag(tagPickerPage.id, name)
           }
           onClose={() => setTagPickerTargetId(null)}
+        />
+      )}
+
+      {relatePicker && pages.some((page) => page.id === relatePicker.fromId) && (
+        <RelatePicker
+          fromPage={pages.find((page) => page.id === relatePicker.fromId)!}
+          toPage={
+            relatePicker.toId
+              ? (pages.find((page) => page.id === relatePicker.toId) ?? null)
+              : null
+          }
+          pages={pages}
+          onCreate={(fromId, toId, label) => {
+            void createRelationship(fromId, toId, label);
+            setRelatePicker(null);
+          }}
+          onClose={() => setRelatePicker(null)}
+        />
+      )}
+
+      {exportOpen && (
+        <ManuscriptPreview
+          projectTitle={workspaceName}
+          chapters={pages
+            .filter((page) => page.pageType === "chapter")
+            .map((page) => ({
+              id: page.id,
+              title: page.title,
+              content: page.content,
+            }))}
+          onClose={() => setExportOpen(false)}
         />
       )}
 
@@ -1541,6 +2116,152 @@ function TagPicker({
         <footer>
           <span>Project tags are available on every page.</span>
           <kbd>Enter</kbd>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function RelatePicker({
+  fromPage,
+  toPage,
+  pages,
+  onCreate,
+  onClose,
+}: {
+  fromPage: StoryPage;
+  toPage: StoryPage | null;
+  pages: StoryPage[];
+  onCreate: (fromId: string, toId: string, label: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [label, setLabel] = useState("");
+  const [selectedId, setSelectedId] = useState(toPage?.id ?? "");
+  const selectedPage =
+    pages.find((page) => page.id === selectedId) ?? toPage;
+  const candidates = pages.filter((page) => {
+    if (page.id === fromPage.id) return false;
+    const haystack = `${page.title} ${PAGE_TYPE_LABELS[page.pageType]}`.toLowerCase();
+    return haystack.includes(query.trim().toLowerCase());
+  });
+
+  function submit() {
+    const cleanLabel = label.trim();
+    if (!selectedPage || !cleanLabel) return;
+    onCreate(fromPage.id, selectedPage.id, cleanLabel);
+  }
+
+  return (
+    <div className="dialog-backdrop tag-dialog-backdrop" role="presentation">
+      <section
+        className="tag-picker"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="relate-picker-title"
+      >
+        <header>
+          <div>
+            <span className="eyebrow">RELATING FROM</span>
+            <h2 id="relate-picker-title">{fromPage.title || "Untitled"}</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close relate picker"
+            onClick={onClose}
+          >
+            <X size={17} />
+          </button>
+        </header>
+        {toPage ? (
+          <p className="relate-target-copy">
+            To {toPage.title || "Untitled"}
+          </p>
+        ) : (
+          <>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (candidates[0]) setSelectedId(candidates[0].id);
+              }}
+            >
+              <Search size={15} />
+              <input
+                autoFocus={!toPage}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find a page to relate…"
+                aria-label="Find a page to relate"
+              />
+            </form>
+            <div className="tag-picker-options">
+              {candidates.map((page) => (
+                <button
+                  type="button"
+                  key={page.id}
+                  className={selectedId === page.id ? "selected" : ""}
+                  onClick={() => setSelectedId(page.id)}
+                >
+                  <span className="tag-option-mark">
+                    {selectedId === page.id ? (
+                      <Check size={13} />
+                    ) : (
+                      <FileText size={12} />
+                    )}
+                  </span>
+                  <span>
+                    {page.title || "Untitled"}
+                    <small className="relate-page-type">
+                      {PAGE_TYPE_LABELS[page.pageType]}
+                    </small>
+                  </span>
+                </button>
+              ))}
+              {candidates.length === 0 && (
+                <p>No other pages match that search.</p>
+              )}
+            </div>
+          </>
+        )}
+        <form
+          className="relate-label-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <GitFork size={15} />
+          <input
+            autoFocus={Boolean(toPage)}
+            value={label}
+            maxLength={40}
+            onChange={(event) => setLabel(event.target.value)}
+            placeholder="Relationship label, e.g. lives in"
+            aria-label="Relationship label"
+          />
+        </form>
+        <div className="relate-suggestions">
+          {RELATIONSHIP_SUGGESTIONS.map((suggestion) => (
+            <button
+              type="button"
+              key={suggestion}
+              onClick={() => setLabel(suggestion)}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+        <footer>
+          <span>Prose links stay mentions; this creates a named relationship.</span>
+          <button
+            type="button"
+            className="relate-save"
+            disabled={!selectedPage || !label.trim()}
+            onClick={submit}
+          >
+            Save
+          </button>
         </footer>
       </section>
     </div>

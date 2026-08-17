@@ -7,6 +7,9 @@ world bible. The current vertical slice includes:
 - A responsive project dashboard for separate books and worlds
 - Private 2:3 book-cover thumbnails backed by Supabase Storage
 - Hierarchical pages and child-page creation
+- Changeable page types with light JSON fields
+- A dedicated Chapters list and print-to-PDF manuscript export
+- Named page relationships, plus a pan-able Web view
 - `Alt+P` to turn the word before the caret into a linked child page
 - `Alt+A` to open the AI writing panel with the current selection
 - BYOK provider selection for OpenAI, Anthropic, and Google Gemini
@@ -34,7 +37,8 @@ Supabase is not required for the local vertical slice. When ready:
 5. Apply the SQL files in `supabase/migrations` in numeric order, or link the
    Supabase CLI and run `supabase db push`. Migration `006` creates the private
    `workspace-covers` bucket and project-creation function. Migration `007`
-   adds project-specific page tags.
+   adds project-specific page tags. Migration `008` adds page types, JSON
+   fields, and named page relationships.
 
 Do not expose the database password, service-role key, or encryption secret in
 the browser. The migration enables row-level security and provisions one

@@ -7,6 +7,7 @@ import StarterKit from "@tiptap/starter-kit";
 import {
   Bold,
   FilePlus2,
+  GitFork,
   Heading2,
   Italic,
   List,
@@ -71,6 +72,7 @@ type StoryEditorProps = {
   tagTarget: { id: string; title: string } | null;
   onTagTargetChange: (pageId: string | null) => void;
   onOpenTags: (pageId: string | null) => void;
+  onOpenRelate: (pageId: string | null) => void;
   onNavigatePage: (pageId: string) => void;
 };
 
@@ -82,6 +84,7 @@ export function StoryEditor({
   tagTarget,
   onTagTargetChange,
   onOpenTags,
+  onOpenRelate,
   onNavigatePage,
 }: StoryEditorProps) {
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -231,6 +234,30 @@ export function StoryEditor({
     [editor, onOpenTags, tagTarget?.id],
   );
 
+  const openRelateCommand = useCallback(
+    (removeSlashCommand = false) => {
+      if (!editor) return false;
+      if (removeSlashCommand) {
+        const { from, to, $from } = editor.state.selection;
+        if (from !== to) return false;
+        const beforeCaret = $from.parent.textBetween(
+          0,
+          $from.parentOffset,
+          " ",
+        );
+        if (!/\/r$/u.test(beforeCaret)) return false;
+        editor
+          .chain()
+          .focus()
+          .deleteRange({ from: $from.pos - 2, to: $from.pos })
+          .run();
+      }
+      onOpenRelate(tagTarget?.id ?? null);
+      return true;
+    },
+    [editor, onOpenRelate, tagTarget?.id],
+  );
+
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
       if (!editor) return;
@@ -243,6 +270,16 @@ export function StoryEditor({
         !event.isComposing &&
         (event.key === "Enter" || event.key === " ") &&
         openTagCommand(true)
+      ) {
+        event.preventDefault();
+        return;
+      }
+      if (
+        editor.isFocused &&
+        noModifiers &&
+        !event.isComposing &&
+        (event.key === "Enter" || event.key === " ") &&
+        openRelateCommand(true)
       ) {
         event.preventDefault();
         return;
@@ -273,6 +310,12 @@ export function StoryEditor({
         return;
       }
 
+      if (event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        openRelateCommand();
+        return;
+      }
+
       if (event.key.toLowerCase() !== "p") return;
       event.preventDefault();
       createPageFromEditorText();
@@ -280,7 +323,13 @@ export function StoryEditor({
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [createPageFromEditorText, editor, onOpenAi, openTagCommand]);
+  }, [
+    createPageFromEditorText,
+    editor,
+    onOpenAi,
+    openRelateCommand,
+    openTagCommand,
+  ]);
 
   if (!editor) return <div className="editor-loading">Opening your page…</div>;
   const dictationEditor = editor;
@@ -464,6 +513,25 @@ export function StoryEditor({
         </button>
         <button
           type="button"
+          className="relate-create-button"
+          title={
+            tagTarget
+              ? `Relate this page to ${tagTarget.title}`
+              : "Relate the most recently linked page"
+          }
+          aria-label={
+            tagTarget
+              ? `Relate this page to ${tagTarget.title}`
+              : "Relate the most recently linked page"
+          }
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => openRelateCommand()}
+        >
+          <GitFork size={16} />
+          <span>Relate</span>
+        </button>
+        <button
+          type="button"
           className={`dictation-button ${listening ? "listening" : ""}`}
           title={
             speechSupported
@@ -481,8 +549,8 @@ export function StoryEditor({
           <span>{listening ? "Stop" : "Dictate"}</span>
         </button>
         {tagTarget && (
-          <span className="tag-target-indicator" title="Current tag target">
-            Tag target: {tagTarget.title}
+          <span className="tag-target-indicator" title="Current tag or relate target">
+            Target: {tagTarget.title}
           </span>
         )}
       </div>

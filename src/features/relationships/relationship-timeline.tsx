@@ -77,7 +77,7 @@ export function RelationshipTimeline({
 }: RelationshipTimelineProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const trayRef = useRef<HTMLDivElement>(null);
-  const titleFieldRef = useRef<HTMLInputElement>(null);
+  const titleFieldRef = useRef<HTMLTextAreaElement>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [boardWidth, setBoardWidth] = useState(0);
   const [userExtent, setUserExtent] = useState(0);
@@ -306,7 +306,9 @@ export function RelationshipTimeline({
   }
 
   function finishNaming(pageId: string, title: string) {
-    onUpdatePage(pageId, { title: title.trim() || "Untitled" });
+    onUpdatePage(pageId, {
+      title: title.replace(/\s*\n+\s*/g, " ").trim() || "Untitled",
+    });
     setNamingId(null);
   }
 
@@ -406,16 +408,20 @@ export function RelationshipTimeline({
                 <div>
                   <small>{PAGE_TYPE_LABELS[page.pageType]}</small>
                   {namingId === page.id ? (
-                    <input
+                    <textarea
                       ref={titleFieldRef}
                       className="timeline-title-field"
+                      rows={1}
                       defaultValue={page.title === "Untitled" ? "" : page.title}
                       placeholder="Untitled"
                       aria-label="Event title"
                       onPointerDown={(event) => event.stopPropagation()}
                       onBlur={(event) => finishNaming(page.id, event.target.value)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter") event.currentTarget.blur();
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }
                         if (event.key === "Escape") setNamingId(null);
                       }}
                     />

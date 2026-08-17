@@ -72,7 +72,8 @@ describe("timeline helpers", () => {
     expect(snapTimelineLane(350, 600)).toBe(3);
     expect(snapTimelineLane(599, 600)).toBe(5);
     expect(serializeTimelineLane(9)).toBe("5");
-    expect(timelineCardWidth(600, 720)).toBeLessThanOrEqual(720 / 3);
+    expect(timelineCardWidth(600, 720)).toBeGreaterThan(600 / 6);
+    expect(timelineCardWidth(600, 720)).toBeLessThanOrEqual(720 * 0.5);
   });
 
   it("places a tray click after the last item", () => {

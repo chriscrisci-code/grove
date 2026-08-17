@@ -1390,8 +1390,7 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   letter-spacing: .1em;
   text-transform: uppercase;
 }
-.timeline-tray-item strong,
-.timeline-card strong {
+.timeline-tray-item strong {
   display: block;
   overflow: hidden;
   color: #303931;
@@ -1447,10 +1446,18 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   touch-action: none;
   user-select: none;
 }
+.timeline-card.dragging,
+.timeline-card:hover { z-index: 3; }
 .timeline-card.dragging { opacity: .78; cursor: grabbing; }
 .timeline-card i { margin-top: 3px; width: 6px; height: 6px; flex-basis: 6px; }
 .timeline-card small { font-size: 7px; }
-.timeline-card strong { font: 650 11px/1.25 Georgia, serif; }
+.timeline-card strong {
+  display: block;
+  color: #303931;
+  font: 650 11px/1.3 Georgia, serif;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 .timeline-card-remove {
   display: grid;
   width: 18px;
@@ -1469,13 +1476,16 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 .timeline-title-field {
   display: block;
   width: 100%;
+  field-sizing: content;
+  resize: none;
   border: 0;
   border-bottom: 1px solid #c8c2b2;
   background: transparent;
   padding: 0 0 1px;
   color: #303931;
-  font: 650 11px/1.25 Georgia, serif;
+  font: 650 11px/1.3 Georgia, serif;
   outline: none;
+  overflow-wrap: anywhere;
 }
 .timeline-drag-ghost {
   position: fixed;

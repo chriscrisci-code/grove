@@ -55,6 +55,10 @@ declare global {
   }
 }
 
+const StoryLink = Link.extend({
+  inclusive: false,
+});
+
 type StoryEditorProps = {
   content: string;
   onChange: (html: string) => void;
@@ -79,7 +83,7 @@ export function StoryEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({ link: false }),
-      Link.configure({
+      StoryLink.configure({
         openOnClick: false,
         HTMLAttributes: { class: "story-link" },
       }),

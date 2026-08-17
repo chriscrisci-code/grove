@@ -29,7 +29,10 @@ export default async function WorkspacePage({
     .order("position");
 
   const pages: StoryPage[] = (rows ?? []).map((page) => {
-    const content = page.content as { html?: string } | string | null;
+    const content = page.content as
+      | { html?: string; unvisited?: boolean }
+      | string
+      | null;
     return {
       id: page.id,
       parentId: page.parent_id,
@@ -38,6 +41,8 @@ export default async function WorkspacePage({
         typeof content === "string"
           ? content
           : content?.html || "<p>Begin writing your story…</p>",
+      unvisited:
+        typeof content === "object" && content?.unvisited === true,
       updatedAt: new Date(page.updated_at).getTime(),
     };
   });

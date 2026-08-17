@@ -37,6 +37,7 @@ export type StoryPage = {
   parentId: string | null;
   title: string;
   content: string;
+  unvisited: boolean;
   updatedAt: number;
 };
 
@@ -49,6 +50,7 @@ const initialPages: StoryPage[] = [
     title: "Welcome to Grove",
     content:
       "<p>Your story begins here. Grove keeps every character, place, and idea within reach.</p><h2>Try a quick link</h2><p>Type a name like <strong>Evermere</strong>, place your cursor after it, and press <strong>Alt+P</strong>. A linked child page will appear instantly.</p><p>Press <strong>Alt+A</strong> whenever you want to think alongside AI.</p>",
+    unvisited: false,
     updatedAt: Date.now(),
   },
   {
@@ -56,6 +58,7 @@ const initialPages: StoryPage[] = [
     parentId: null,
     title: "Characters",
     content: "<p>Keep the people at the heart of your story here.</p>",
+    unvisited: false,
     updatedAt: Date.now() - 1000,
   },
   {
@@ -64,6 +67,7 @@ const initialPages: StoryPage[] = [
     title: "Mara Venn",
     content:
       "<h2>Role</h2><p>Protagonist</p><h2>Wants</h2><p>To discover what happened beyond the northern ridge.</p>",
+    unvisited: false,
     updatedAt: Date.now() - 2000,
   },
   {
@@ -71,6 +75,7 @@ const initialPages: StoryPage[] = [
     parentId: null,
     title: "Places",
     content: "<p>Map the places that shape your world.</p>",
+    unvisited: false,
     updatedAt: Date.now() - 3000,
   },
 ];
@@ -204,7 +209,7 @@ export function Workspace({
               workspace_id: workspaceId,
               parent_id: page.parentId,
               title: page.title || "Untitled",
-              content: { html: page.content },
+              content: { html: page.content, unvisited: page.unvisited },
               position,
               created_by: userId,
             })),
@@ -249,19 +254,24 @@ export function Workspace({
   }, [pages, search]);
 
   const createPage = useCallback(
-    (parentId: string | null = null, title = "Untitled") => {
+    (
+      parentId: string | null = null,
+      title = "Untitled",
+      activate = true,
+    ) => {
       const page: StoryPage = {
         id: makeId(),
         parentId,
         title,
         content: "<p></p>",
+        unvisited: !activate,
         updatedAt: Date.now(),
       };
       setPages((current) => [...current, page]);
       if (parentId) {
         setExpanded((current) => new Set(current).add(parentId));
       }
-      setActiveId(page.id);
+      if (activate) setActiveId(page.id);
       return page;
     },
     [],
@@ -274,7 +284,7 @@ export function Workspace({
           page.parentId === activeId &&
           page.title.toLowerCase() === title.toLowerCase(),
       );
-      const page = existing ?? createPage(activeId, title);
+      const page = existing ?? createPage(activeId, title, false);
       applyLink(`#page-${page.id}`);
       setNotice(existing ? `Linked to ${page.title}` : `Created ${page.title}`);
       window.setTimeout(() => setNotice(""), 2200);
@@ -343,6 +353,7 @@ export function Workspace({
             parentId: null,
             title: "Untitled",
             content: "<p></p>",
+            unvisited: false,
             updatedAt: Date.now(),
           },
         ];
@@ -463,6 +474,13 @@ export function Workspace({
               expanded={expanded}
               onSelect={(id) => {
                 setActiveId(id);
+                setPages((current) =>
+                  current.map((page) =>
+                    page.id === id && page.unvisited
+                      ? { ...page, unvisited: false }
+                      : page,
+                  ),
+                );
                 if (isNarrow) setSidebarOpen(false);
               }}
               onToggle={(id) =>
@@ -742,7 +760,7 @@ type PageBranchProps = {
   expanded: Set<string>;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
-  onAdd: (parentId: string, title?: string) => StoryPage;
+  onAdd: (parentId: string, title?: string, activate?: boolean) => StoryPage;
   onDelete: (id: string) => void;
 };
 
@@ -763,7 +781,11 @@ function PageBranch({
       const hasChildren = allPages.some((child) => child.parentId === page.id);
       return (
         <div key={page.id}>
-          <div className={`page-row ${activeId === page.id ? "active" : ""}`}>
+          <div
+            className={`page-row ${activeId === page.id ? "active" : ""} ${
+              page.unvisited ? "unvisited" : ""
+            }`}
+          >
             <button
               type="button"
               className="tree-toggle"
@@ -788,6 +810,9 @@ function PageBranch({
               onClick={() => onSelect(page.id)}
             >
               <FileText size={15} />
+              {page.unvisited && (
+                <span className="unvisited-page-dot" title="New page" />
+              )}
               <span>{page.title || "Untitled"}</span>
             </button>
             <button

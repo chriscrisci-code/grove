@@ -43,7 +43,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["Type"],
-        text: "Set a page to Character, Location, Animal, Transport, or Unique object for extra fields, including Also known as (comma-separated nicknames).",
+        text: "Set a page to Event, Character, Location, Animal, Transport, or Unique object for extra fields, including Also known as. Events stay in Your story and can nest like other pages.",
       },
       {
         keys: ["Chapters"],

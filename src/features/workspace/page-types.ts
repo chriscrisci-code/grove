@@ -1,6 +1,7 @@
 export const PAGE_TYPES = [
   "page",
   "chapter",
+  "event",
   "character",
   "location",
   "animal",
@@ -19,6 +20,7 @@ export type PageFieldDef = {
 export const PAGE_TYPE_LABELS: Record<PageType, string> = {
   page: "Page",
   chapter: "Chapter",
+  event: "Event",
   character: "Character",
   location: "Location",
   animal: "Animal",
@@ -35,6 +37,7 @@ const AKA_FIELD: PageFieldDef = {
 export const PAGE_TYPE_FIELDS: Record<PageType, PageFieldDef[]> = {
   page: [],
   chapter: [],
+  event: [AKA_FIELD],
   character: [
     { key: "role", label: "Role" },
     { key: "wants", label: "Wants" },
@@ -49,6 +52,7 @@ export const PAGE_TYPE_FIELDS: Record<PageType, PageFieldDef[]> = {
 export const PAGE_TYPE_COLORS: Record<PageType, string> = {
   page: "#6d746c",
   chapter: "#4d765b",
+  event: "#8a6b3d",
   character: "#6a5a8a",
   location: "#3f6f86",
   animal: "#7a6240",

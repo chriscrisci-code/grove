@@ -38,7 +38,8 @@ Supabase is not required for the local vertical slice. When ready:
    Supabase CLI and run `supabase db push`. Migration `006` creates the private
    `workspace-covers` bucket and project-creation function. Migration `007`
    adds project-specific page tags. Migration `008` adds page types, JSON
-   fields, and named page relationships.
+   fields, and named page relationships. Migration `009` adds the Event page
+   type.
 
 Do not expose the database password, service-role key, or encryption secret in
 the browser. The migration enables row-level security and provisions one

@@ -45,6 +45,12 @@ describe("page types and chapter order", () => {
     expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
   });
 
+  it("keeps an event nested in the page tree", () => {
+    const next = applyPageTypeChange(pages, "mara", "event");
+    expect(next.find((page) => page.id === "mara")?.pageType).toBe("event");
+    expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
+  });
+
   it("splits also-known-as names on commas", () => {
     expect(parseAkaNames("E-Town, the White City, e-town")).toEqual([
       "E-Town",

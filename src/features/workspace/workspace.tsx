@@ -130,6 +130,7 @@ export function Workspace({
   const [sidebarWidth, setSidebarWidth] = useState(274);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagPanelHeight, setTagPanelHeight] = useState(180);
+  const [expandedTagId, setExpandedTagId] = useState<string | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
@@ -753,10 +754,64 @@ export function Workspace({
                   const usageCount = Object.values(pageTags).filter(
                     (assignedTags) => assignedTags.includes(tag.id),
                   ).length;
+                  const taggedPages = pages.filter((page) =>
+                    (pageTags[page.id] ?? []).includes(tag.id),
+                  );
+                  const tagExpanded = expandedTagId === tag.id;
                   return (
-                    <div className="sidebar-tag-row" key={tag.id}>
-                      <span>{tag.name}</span>
-                      <small>{usageCount}</small>
+                    <div className="sidebar-tag-group" key={tag.id}>
+                      <button
+                        type="button"
+                        className={`sidebar-tag-row ${
+                          tagExpanded ? "active" : ""
+                        }`}
+                        aria-expanded={tagExpanded}
+                        onClick={() =>
+                          setExpandedTagId((current) =>
+                            current === tag.id ? null : tag.id,
+                          )
+                        }
+                      >
+                        {tagExpanded ? (
+                          <ChevronDown size={12} />
+                        ) : (
+                          <ChevronRight size={12} />
+                        )}
+                        <span>{tag.name}</span>
+                        <small>{usageCount}</small>
+                      </button>
+                      {tagExpanded && (
+                        <div
+                          className="sidebar-tag-pages"
+                          aria-label={`Pages tagged ${tag.name}`}
+                        >
+                          {taggedPages.map((page) => (
+                            <button
+                              type="button"
+                              key={page.id}
+                              className={page.id === activeId ? "active" : ""}
+                              onClick={() => {
+                                setActiveId(page.id);
+                                setTagTargetId(null);
+                                setTagPickerTargetId(null);
+                                setPages((current) =>
+                                  current.map((candidate) =>
+                                    candidate.id === page.id &&
+                                    candidate.unvisited
+                                      ? { ...candidate, unvisited: false }
+                                      : candidate,
+                                  ),
+                                );
+                                if (isNarrow) setSidebarOpen(false);
+                              }}
+                            >
+                              <FileText size={12} />
+                              <span>{page.title || "Untitled"}</span>
+                            </button>
+                          ))}
+                          {taggedPages.length === 0 && <p>No pages yet.</p>}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

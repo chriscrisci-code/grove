@@ -281,14 +281,20 @@ kbd {
 }
 .sidebar-tag-row {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 8px;
+  border: 0;
   border-radius: 7px;
-  padding: 7px 9px 7px 29px;
+  background: transparent;
+  padding: 7px 9px;
   color: #586159;
+  cursor: pointer;
   font-size: 11px;
+  text-align: left;
 }
-.sidebar-tag-row:hover { background: rgb(49 77 62 / 5%); }
+.sidebar-tag-row:hover,
+.sidebar-tag-row.active { background: rgb(49 77 62 / 7%); }
 .sidebar-tag-row > span {
   min-width: 0;
   overflow: hidden;
@@ -297,6 +303,42 @@ kbd {
 }
 .sidebar-tag-row small {
   margin-left: auto;
+  color: #9a9e97;
+  font-size: 9px;
+}
+.sidebar-tag-pages {
+  display: grid;
+  gap: 2px;
+  margin: 1px 0 5px 20px;
+  border-left: 1px solid #d9ddd6;
+  padding-left: 5px;
+}
+.sidebar-tag-pages > button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 8px;
+  color: #697069;
+  cursor: pointer;
+  font-size: 10px;
+  text-align: left;
+}
+.sidebar-tag-pages > button:hover,
+.sidebar-tag-pages > button.active {
+  background: #e5e9e1;
+  color: #34503e;
+}
+.sidebar-tag-pages > button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-tag-pages > p {
+  margin: 5px 8px;
   color: #9a9e97;
   font-size: 9px;
 }

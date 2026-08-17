@@ -1735,6 +1735,19 @@ export function Workspace({
               onTagTargetChange={setTagTargetId}
               onOpenTags={openTagPicker}
               onOpenRelate={openRelatePicker}
+              linkablePages={pages.map((page) => ({
+                id: page.id,
+                title: page.title,
+              }))}
+              currentPageId={activePage.id}
+              onFindLinks={(count) => {
+                setNotice(
+                  count
+                    ? `Linked ${count} ${count === 1 ? "name" : "names"}`
+                    : "No matching page names on this page.",
+                );
+                window.setTimeout(() => setNotice(""), 2200);
+              }}
               onNavigatePage={(id) => {
                 if (!pages.some((page) => page.id === id)) return;
                 setActiveId(id);

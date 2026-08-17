@@ -1114,7 +1114,8 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 .editor-toolbar .dictation-button,
 .editor-toolbar .page-create-button,
 .editor-toolbar .tag-create-button,
-.editor-toolbar .relate-create-button {
+.editor-toolbar .relate-create-button,
+.editor-toolbar .find-links-button {
   display: flex;
   width: auto;
   align-items: center;
@@ -1126,7 +1127,8 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 }
 .editor-toolbar .page-create-button,
 .editor-toolbar .tag-create-button,
-.editor-toolbar .relate-create-button { color: #526357; }
+.editor-toolbar .relate-create-button,
+.editor-toolbar .find-links-button { color: #526357; }
 .editor-toolbar .dictation-button.listening {
   background: #e9f0e9;
   color: #315c42;
@@ -2066,7 +2068,8 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   .editor-toolbar .dictation-button,
   .editor-toolbar .page-create-button,
   .editor-toolbar .tag-create-button,
-  .editor-toolbar .relate-create-button {
+  .editor-toolbar .relate-create-button,
+  .editor-toolbar .find-links-button {
     width: auto;
     flex: 0 0 auto;
     order: -2;

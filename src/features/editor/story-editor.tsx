@@ -10,6 +10,7 @@ import {
   GitFork,
   Heading2,
   Italic,
+  Link2,
   List,
   ListOrdered,
   Mic,
@@ -18,6 +19,7 @@ import {
   Tag,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { findPageTitleMatches } from "@/features/editor/find-page-links";
 
 type SpeechResult = {
   isFinal: boolean;
@@ -74,6 +76,9 @@ type StoryEditorProps = {
   onOpenTags: (pageId: string | null) => void;
   onOpenRelate: (pageId: string | null) => void;
   onNavigatePage: (pageId: string) => void;
+  linkablePages: { id: string; title: string }[];
+  currentPageId: string;
+  onFindLinks: (count: number) => void;
 };
 
 export function StoryEditor({
@@ -86,6 +91,9 @@ export function StoryEditor({
   onOpenTags,
   onOpenRelate,
   onNavigatePage,
+  linkablePages,
+  currentPageId,
+  onFindLinks,
 }: StoryEditorProps) {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -258,6 +266,56 @@ export function StoryEditor({
     [editor, onOpenRelate, tagTarget?.id],
   );
 
+  const findExistingPageLinks = useCallback(
+    (removeSlashCommand = false) => {
+      if (!editor) return false;
+      const { from, to, $from } = editor.state.selection;
+      if (removeSlashCommand) {
+        if (from !== to) return false;
+        const beforeCaret = $from.parent.textBetween(
+          0,
+          $from.parentOffset,
+          " ",
+        );
+        if (!beforeCaret.endsWith("/link")) return false;
+      }
+
+      const pages = linkablePages.filter((page) => page.id !== currentPageId);
+      const tr = editor.state.tr;
+      if (removeSlashCommand) {
+        tr.delete($from.pos - "/link".length, $from.pos);
+      }
+
+      const linkType = editor.schema.marks.link;
+      const pending: { from: number; to: number; pageId: string }[] = [];
+      tr.doc.descendants((node, pos) => {
+        if (!node.isText || !node.text) return;
+        if (node.marks.some((mark) => mark.type === linkType)) return;
+        for (const match of findPageTitleMatches(node.text, pages)) {
+          pending.push({
+            from: pos + match.from,
+            to: pos + match.to,
+            pageId: match.pageId,
+          });
+        }
+      });
+
+      for (const match of pending) {
+        tr.addMark(
+          match.from,
+          match.to,
+          linkType.create({ href: `#page-${match.pageId}` }),
+        );
+      }
+
+      if (tr.docChanged) editor.view.dispatch(tr);
+      else editor.chain().focus().run();
+      onFindLinks(pending.length);
+      return true;
+    },
+    [currentPageId, editor, linkablePages, onFindLinks],
+  );
+
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
       if (!editor) return;
@@ -280,6 +338,16 @@ export function StoryEditor({
         !event.isComposing &&
         (event.key === "Enter" || event.key === " ") &&
         openRelateCommand(true)
+      ) {
+        event.preventDefault();
+        return;
+      }
+      if (
+        editor.isFocused &&
+        noModifiers &&
+        !event.isComposing &&
+        (event.key === "Enter" || event.key === " ") &&
+        findExistingPageLinks(true)
       ) {
         event.preventDefault();
         return;
@@ -316,6 +384,12 @@ export function StoryEditor({
         return;
       }
 
+      if (event.key.toLowerCase() === "l") {
+        event.preventDefault();
+        findExistingPageLinks();
+        return;
+      }
+
       if (event.key.toLowerCase() !== "p") return;
       event.preventDefault();
       createPageFromEditorText();
@@ -326,6 +400,7 @@ export function StoryEditor({
   }, [
     createPageFromEditorText,
     editor,
+    findExistingPageLinks,
     onOpenAi,
     openRelateCommand,
     openTagCommand,
@@ -529,6 +604,17 @@ export function StoryEditor({
         >
           <GitFork size={16} />
           <span>Relate</span>
+        </button>
+        <button
+          type="button"
+          className="find-links-button"
+          title="Find Links — wrap names on this page that already have pages"
+          aria-label="Find Links"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => findExistingPageLinks()}
+        >
+          <Link2 size={16} />
+          <span>Links</span>
         </button>
         <button
           type="button"

@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { canUseFeature, paidRequiredResponse } from "@/features/billing/plan";
-import { createClient } from "@/lib/supabase/server";
+import { requirePaidFeature } from "@/features/billing/require-feature";
 
 export const runtime = "nodejs";
 
@@ -17,12 +16,8 @@ type TavilyResult = {
 };
 
 export async function POST(request: Request) {
-  if (!canUseFeature("research")) return paidRequiredResponse("research");
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const gated = await requirePaidFeature("research");
+  if (!gated.ok) return gated.response;
 
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) {

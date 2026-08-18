@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PricingPage } from "@/features/marketing/pricing-page";
+import { isStripeConfigured } from "@/lib/stripe";
 
 export const metadata: Metadata = {
   title: "Pricing · Grove",
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function Pricing() {
-  return <PricingPage />;
+  return <PricingPage paymentsReady={isStripeConfigured()} />;
 }

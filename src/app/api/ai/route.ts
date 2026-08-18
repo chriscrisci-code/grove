@@ -3,7 +3,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { z } from "zod";
-import { canUseFeature, paidRequiredResponse } from "@/features/billing/plan";
+import { canUseFeature, paidRequiredResponse, planAccessFromBilling } from "@/features/billing/plan";
+import { billingStateForClient } from "@/features/billing/require-feature";
 import { decryptSecret } from "@/features/ai/server/encryption";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
@@ -18,21 +19,33 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  if (!canUseFeature("aiAsk")) return paidRequiredResponse("aiAsk");
   const parsed = requestSchema.safeParse(await request.json());
   if (!parsed.success) {
     return Response.json({ error: "Invalid AI request." }, { status: 400 });
+  }
+
+  const supabaseConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  );
+  const supabase = supabaseConfigured ? await createSupabaseClient() : null;
+  const user = supabase ? (await supabase.auth.getUser()).data.user : null;
+  if (user && supabase) {
+    const billing = await billingStateForClient(supabase);
+    if (!canUseFeature("aiAsk", planAccessFromBilling(billing.effectivePlan))) {
+      return paidRequiredResponse("aiAsk");
+    }
+  } else if (!parsed.data.apiKey) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let { provider, model, apiKey } = parsed.data;
   const { prompt, context } = parsed.data;
 
   if (!apiKey) {
-    const supabase = await createSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user || !supabase) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { data: settings } = await supabase
       .from("ai_settings")

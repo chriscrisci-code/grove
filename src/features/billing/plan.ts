@@ -1,5 +1,5 @@
-/** Flip to false when Stripe is live and free limits should apply. */
-export const UNLOCK_PAID_FOR_TESTING = true;
+/** Used by the local demo and tests. Live requests read billing from Supabase. */
+export const UNLOCK_PAID_FOR_TESTING = false;
 
 export const FREE_LIMITS = {
   projects: 1,
@@ -52,6 +52,13 @@ export function getPlanAccess(options?: {
   };
 }
 
+export function planAccessFromBilling(effectivePlan: "free" | "plus") {
+  return getPlanAccess({
+    unlockPaid: false,
+    subscribed: effectivePlan === "plus",
+  });
+}
+
 export function canUseFeature(
   feature: FeatureName,
   access = getPlanAccess(),
@@ -86,7 +93,7 @@ export function planLimitMessage(feature: FeatureName) {
     case "relationships":
       return "Relationships is a Grove Plus feature.";
     case "chapterPdf":
-      return "Printing chapters to PDF is a Grove Plus feature.";
+      return "Printing chapters or scripts to PDF is a Grove Plus feature.";
     case "covers":
       return "Project covers are a Grove Plus feature.";
     case "nightColors":

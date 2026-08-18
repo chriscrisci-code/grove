@@ -24,7 +24,11 @@ const PLUS_FEATURES = [
   "Future premium planning tools",
 ];
 
-export function PricingPage() {
+export function PricingPage({
+  paymentsReady = false,
+}: {
+  paymentsReady?: boolean;
+}) {
   return (
     <MarketingShell>
       <main className="pricing-main">
@@ -37,13 +41,15 @@ export function PricingPage() {
           </p>
         </section>
 
-        <div className="pricing-preview-note">
-          <Sparkles size={17} />
-          <p>
-            Grove Plus payments are not connected yet. During the preview,
-            every feature remains available while billing is prepared.
-          </p>
-        </div>
+        {paymentsReady ? null : (
+          <div className="pricing-preview-note">
+            <Sparkles size={17} />
+            <p>
+              Grove Plus payments are not connected on this environment yet.
+              Every feature remains available while billing keys are added.
+            </p>
+          </div>
+        )}
 
         <section className="pricing-grid" aria-label="Grove plans">
           <article className="pricing-card">
@@ -73,7 +79,7 @@ export function PricingPage() {
           <article className="pricing-card featured">
             <div className="pricing-card-topline">
               <span className="eyebrow">GROVE PLUS</span>
-              <small>COMING SOON</small>
+              {paymentsReady ? <small>MOST CHOSEN</small> : <small>COMING SOON</small>}
             </div>
             <h2>Let the whole world grow</h2>
             <p className="pricing-price">
@@ -89,7 +95,7 @@ export function PricingPage() {
               href="/checkout?plan=plus"
               className="marketing-primary-cta"
             >
-              View the Plus plan
+              {paymentsReady ? "Choose Grove Plus" : "View the Plus plan"}
               <ArrowRight size={16} />
             </Link>
             <ul>
@@ -122,8 +128,8 @@ export function PricingPage() {
           <article>
             <h3>Cancel without a maze.</h3>
             <p>
-              Once payments launch, billing and cancellation will be available
-              directly from the account page.
+              Once payments are connected, billing and cancellation are
+              available from Account &amp; billing.
             </p>
           </article>
         </section>
@@ -169,6 +175,15 @@ export function PricingPage() {
                 can read, copy, comment, and suggest wording. Editors can also
                 write. Grove keeps one person editing at a time so two drafts
                 cannot overwrite each other.
+              </p>
+            </details>
+            <details>
+              <summary>How do I cancel Grove Plus?</summary>
+              <p>
+                Open Account &amp; billing and choose Manage billing. Stripe
+                lets you update the card or cancel. If Plus ends, every story
+                stays readable and copyable, and one Active Free Story remains
+                editable.
               </p>
             </details>
             <details>

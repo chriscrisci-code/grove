@@ -2,6 +2,7 @@ export const CHANGELOG = [
   {
     date: "August 18, 2026",
     items: [
+      "Grove Plus checkout now uses Stripe. Webhooks keep the plan in sync, and Account & billing opens the customer portal.",
       "Grove now opens with a public introduction and pricing page, with dedicated sign-in, signup, onboarding, dashboard, and billing routes.",
       "Stories stay readable and copyable after Plus ends. One Active Free Story remains editable, with a seven-day choice period and 30-day switching.",
       "Grove Plus owners can invite Reviewers or Editors with private links. Members can comment on pages, quote selections, and suggest replacement text without simultaneous editing conflicts.",

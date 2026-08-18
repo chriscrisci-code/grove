@@ -4339,6 +4339,38 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 .billing-boundary-card > .eyebrow { display: block; margin-top: 20px; }
 .billing-plan-summary > b { color: var(--title); font: 700 24px Georgia, serif; }
 .billing-plan-summary > b small { color: var(--muted); font: 9px var(--font-geist-sans); }
+.checkout-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+.checkout-form > .marketing-primary-cta,
+.manage-billing-control > .marketing-primary-cta { width: 100%; }
+.billing-interval-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.billing-interval-toggle button {
+  min-height: 43px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--forest);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.billing-interval-toggle button[aria-pressed="true"] {
+  border-color: var(--forest);
+  background: var(--forest-soft);
+}
+.checkout-error,
+.manage-billing-control small {
+  color: #9b4f49;
+  font-size: 10px;
+}
+.manage-billing-control { display: grid; gap: 8px; }
 .billing-status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
 .billing-access-policy {
   margin-top: 14px;

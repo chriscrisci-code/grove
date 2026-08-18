@@ -77,6 +77,7 @@ import {
   getPlanAccess,
   planLimitMessage,
   type FeatureName,
+  type PlanAccess,
 } from "@/features/billing/plan";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -198,6 +199,7 @@ type WorkspaceProps = {
   userEmail?: string;
   readOnly?: boolean;
   workspaceRole?: "owner" | "editor" | "viewer";
+  planAccess?: PlanAccess;
 };
 
 export function Workspace({
@@ -213,9 +215,12 @@ export function Workspace({
   userEmail,
   readOnly: serverReadOnly = false,
   workspaceRole,
+  planAccess: serverPlanAccess,
 }: WorkspaceProps = {}) {
   const router = useRouter();
   const cloudMode = Boolean(workspaceId && userId);
+  const planAccess =
+    serverPlanAccess ?? getPlanAccess({ unlockPaid: !cloudMode });
   const shouldClaimEditLease =
     cloudMode &&
     !serverReadOnly &&
@@ -607,7 +612,7 @@ export function Workspace({
 
   const openAi = useCallback(
     (selectedText = "") => {
-      if (!canUseFeature("aiAsk")) {
+      if (!canUseFeature("aiAsk", planAccess)) {
         denyPlan("aiAsk");
         return;
       }
@@ -616,7 +621,7 @@ export function Workspace({
       setReviewOpen(false);
       setSidebarOpen(false);
     },
-    [denyPlan],
+    [denyPlan, planAccess],
   );
 
   useEffect(() => {
@@ -711,7 +716,7 @@ export function Workspace({
         blockReadOnly();
         return null;
       }
-      if (!canCreatePage(pages.length, getPlanAccess())) {
+      if (!canCreatePage(pages.length, planAccess)) {
         denyPlan("extraPages");
         return null;
       }
@@ -734,7 +739,7 @@ export function Workspace({
       if (activate) setActiveId(page.id);
       return page;
     },
-    [blockReadOnly, denyPlan, pages.length, readOnly],
+    [blockReadOnly, denyPlan, pages.length, planAccess, readOnly],
   );
 
   const movePage = useCallback(
@@ -1778,7 +1783,7 @@ export function Workspace({
                 aria-label="Export manuscript"
                 title="Print chapters as PDF"
                 onClick={() => {
-                  if (!canUseFeature("chapterPdf")) {
+                  if (!canUseFeature("chapterPdf", planAccess)) {
                     denyPlan("chapterPdf");
                     return;
                   }
@@ -1908,7 +1913,7 @@ export function Workspace({
                 aria-label="Export script"
                 title="Print scripts as PDF"
                 onClick={() => {
-                  if (!canUseFeature("chapterPdf")) {
+                  if (!canUseFeature("chapterPdf", planAccess)) {
                     denyPlan("chapterPdf");
                     return;
                   }
@@ -2278,7 +2283,7 @@ export function Workspace({
                 type="button"
                 className={`research-button ${researchOpen ? "active" : ""}`}
                 onClick={() => {
-                  if (!canUseFeature("research")) {
+                  if (!canUseFeature("research", planAccess)) {
                     denyPlan("research");
                     return;
                   }
@@ -2298,7 +2303,7 @@ export function Workspace({
                 type="button"
                 className={`research-button ${relationshipsOpen ? "active" : ""}`}
                 onClick={() => {
-                  if (!canUseFeature("relationships")) {
+                  if (!canUseFeature("relationships", planAccess)) {
                     denyPlan("relationships");
                     return;
                   }
@@ -2740,6 +2745,7 @@ export function Workspace({
           model={model}
           apiKey={apiKey}
           secureStorage={cloudMode}
+          isPaid={planAccess.isPaid}
           onSetPassword={
             cloudMode
               ? async (password) => {
@@ -3464,6 +3470,7 @@ function SettingsDialog({
   model,
   apiKey,
   secureStorage,
+  isPaid,
   onSetPassword,
   onClose,
   onSave,
@@ -3472,6 +3479,7 @@ function SettingsDialog({
   model: string;
   apiKey: string;
   secureStorage: boolean;
+  isPaid: boolean;
   onSetPassword?: (password: string) => Promise<boolean>;
   onClose: () => void;
   onSave: (provider: AiProvider, model: string, apiKey: string) => void;
@@ -3556,8 +3564,10 @@ function SettingsDialog({
               <h3>Grove Plus</h3>
               <p>
                 Free includes 1 story and 50 pages. Plus unlocks more stories,
-                unlimited pages, Ask AI, Research, and chapter PDF. Billing is
-                not live yet, so every feature stays on while we test.
+                unlimited pages, Ask AI, Research, review, and chapter PDF.
+                {isPaid
+                  ? " Grove Plus is on for this account."
+                  : " Account & billing is where you subscribe or manage the plan."}
               </p>
             </div>
             <Link

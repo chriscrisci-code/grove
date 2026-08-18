@@ -3,8 +3,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { normalizeBillingState } from "@/features/billing/billing-state";
+import {
+  hasLivePlusSubscription,
+  normalizeBillingState,
+} from "@/features/billing/billing-state";
 import { DeleteAccountButton } from "@/features/billing/delete-account-button";
+import { ManageBillingButton } from "@/features/billing/manage-billing-button";
+import { isStripeConfigured } from "@/lib/stripe";
 
 export const metadata: Metadata = {
   title: "Billing · Grove",
@@ -25,6 +30,8 @@ export default async function BillingPage() {
   if (!user) redirect("/sign-in?next=/account/billing");
   const { data: rawBilling } = await supabase.rpc("get_my_billing_state");
   const billing = normalizeBillingState(rawBilling);
+  const paymentsReady = isStripeConfigured();
+  const subscribed = hasLivePlusSubscription(billing.subscriptionStatus);
   const { data: activeWorkspace } = billing.activeWorkspaceId
     ? await supabase
         .from("workspaces")
@@ -32,6 +39,24 @@ export default async function BillingPage() {
         .eq("id", billing.activeWorkspaceId)
         .maybeSingle()
     : { data: null };
+
+  const planLabel = billing.previewMode
+    ? subscribed
+      ? "Preview access · Grove Plus"
+      : "Preview access"
+    : billing.effectivePlan === "plus"
+      ? "Grove Plus"
+      : "Grove Free";
+
+  const planDetail = billing.previewMode
+    ? subscribed
+      ? "Your subscription is on. Preview still leaves every feature open until Free limits are turned on."
+      : paymentsReady
+        ? "You can subscribe now. Preview still leaves every feature open until Free limits are turned on."
+        : "Billing keys are not on this environment yet, so every Grove feature remains available."
+    : billing.effectivePlan === "plus"
+      ? "Every story is editable"
+      : `Active Free Story: ${activeWorkspace?.name ?? "your most recently edited story"}`;
 
   return (
     <main className="billing-boundary-main">
@@ -46,27 +71,17 @@ export default async function BillingPage() {
         <p>
           Signed in as <strong>{user.email}</strong>.{" "}
           {billing.previewMode
-            ? "Billing is not connected yet, so every Grove feature remains available while payment support is prepared."
+            ? paymentsReady
+              ? "Subscribe when you are ready. Preview does not collect a required payment to keep writing."
+              : "Add Stripe keys to start taking Grove Plus payments."
             : "Manage your plan and which story stays editable on Grove Free."}
         </p>
         <div className="billing-plan-summary">
           <div>
             <span className="billing-status-dot" />
             <div>
-              <strong>
-                {billing.previewMode
-                  ? "Preview access"
-                  : billing.effectivePlan === "plus"
-                    ? "Grove Plus"
-                    : "Grove Free"}
-              </strong>
-              <small>
-                {billing.previewMode
-                  ? "No active subscription or payment method"
-                  : billing.effectivePlan === "plus"
-                    ? "Every story is editable"
-                    : `Active Free Story: ${activeWorkspace?.name ?? "your most recently edited story"}`}
-              </small>
+              <strong>{planLabel}</strong>
+              <small>{planDetail}</small>
             </div>
           </div>
         </div>
@@ -87,16 +102,27 @@ export default async function BillingPage() {
             <ArrowLeft size={15} />
             Your projects
           </Link>
-          <Link href="/pricing" className="marketing-primary-cta">
-            Compare plans
-          </Link>
+          {subscribed && billing.hasStripeCustomer ? (
+            <ManageBillingButton />
+          ) : paymentsReady ? (
+            <Link href="/checkout?plan=plus" className="marketing-primary-cta">
+              {billing.effectivePlan === "plus" && !subscribed
+                ? "Keep Plus when preview ends"
+                : "Choose Grove Plus"}
+            </Link>
+          ) : (
+            <Link href="/pricing" className="marketing-primary-cta">
+              Compare plans
+            </Link>
+          )}
         </div>
         <div className="billing-danger-zone">
           <div>
             <strong>Delete account</strong>
             <p>
               This is always your choice. It permanently removes every story
-              and cannot be undone.
+              and cannot be undone. An active Grove Plus subscription is
+              canceled first.
             </p>
           </div>
           <DeleteAccountButton />

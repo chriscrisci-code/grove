@@ -155,7 +155,7 @@ const SECTIONS = [
       },
       {
         keys: ["Paid"],
-        text: "Free includes 1 story and 50 pages. Grove Plus will unlock more stories, unlimited pages, collaboration, Ask AI, Research, and chapter PDF. Payments are not connected during the preview.",
+        text: "Free includes 1 story and 50 pages. Grove Plus unlocks more stories, unlimited pages, collaboration, Ask AI, Research, and chapter PDF. Subscribe from Account & billing.",
       },
     ],
   },

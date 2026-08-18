@@ -12,6 +12,8 @@ import {
 } from "@/features/workspace/page-types";
 import { normalizeGeographyDocument } from "@/features/relationships/geography";
 import { normalizeTagColor } from "@/features/workspace/tags";
+import { normalizeBillingState } from "@/features/billing/billing-state";
+import { planAccessFromBilling } from "@/features/billing/plan";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function WorkspacePage({
@@ -36,13 +38,15 @@ export default async function WorkspacePage({
     .eq("id", workspaceId)
     .single();
   if (!workspace) notFound();
-  const [{ data: canEdit }, { data: workspaceRole }] = await Promise.all([
+  const [{ data: canEdit }, { data: workspaceRole }, { data: rawBilling }] =
+    await Promise.all([
     supabase.rpc("caller_can_edit_workspace", {
       check_workspace_id: workspace.id,
     }),
     supabase.rpc("workspace_role_for", {
       check_workspace_id: workspace.id,
     }),
+    supabase.rpc("get_my_billing_state"),
   ]);
 
   const { data: rows } = await supabase
@@ -144,6 +148,9 @@ export default async function WorkspacePage({
       workspaceName={workspace.name}
       userId={user.id}
       userEmail={user.email}
+      planAccess={planAccessFromBilling(
+        normalizeBillingState(rawBilling).effectivePlan,
+      )}
     />
   );
 }

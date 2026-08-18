@@ -11,6 +11,21 @@ describe("billing state", () => {
     expect(normalizeBillingState(null)).toEqual(PREVIEW_BILLING_STATE);
   });
 
+  it("normalizes Stripe subscription fields", () => {
+    expect(
+      normalizeBillingState({
+        effectivePlan: "plus",
+        previewMode: false,
+        subscriptionStatus: "active",
+        hasStripeCustomer: true,
+      }),
+    ).toMatchObject({
+      subscriptionStatus: "active",
+      hasStripeCustomer: true,
+      previewMode: false,
+    });
+  });
+
   it("normalizes a free account and its active story", () => {
     expect(
       normalizeBillingState({

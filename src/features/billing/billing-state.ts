@@ -1,20 +1,53 @@
+export type SubscriptionStatus =
+  | "none"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "unpaid";
+
 export type BillingState = {
   effectivePlan: "free" | "plus";
   previewMode: boolean;
+  subscriptionStatus: SubscriptionStatus;
+  hasStripeCustomer: boolean;
   activeWorkspaceId: string | null;
   activeWorkspaceChangedAt: string | null;
   nextActiveSwitchAt: string | null;
   activeSelectionGraceUntil: string | null;
 };
 
+const SUBSCRIPTION_STATUSES: SubscriptionStatus[] = [
+  "none",
+  "trialing",
+  "active",
+  "past_due",
+  "canceled",
+  "unpaid",
+];
+
 export const PREVIEW_BILLING_STATE: BillingState = {
   effectivePlan: "plus",
   previewMode: true,
+  subscriptionStatus: "none",
+  hasStripeCustomer: false,
   activeWorkspaceId: null,
   activeWorkspaceChangedAt: null,
   nextActiveSwitchAt: null,
   activeSelectionGraceUntil: null,
 };
+
+export const FREE_BILLING_STATE: BillingState = {
+  ...PREVIEW_BILLING_STATE,
+  effectivePlan: "free",
+  previewMode: false,
+};
+
+function asSubscriptionStatus(value: unknown): SubscriptionStatus {
+  return SUBSCRIPTION_STATUSES.includes(value as SubscriptionStatus)
+    ? (value as SubscriptionStatus)
+    : "none";
+}
 
 export function normalizeBillingState(value: unknown): BillingState {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -24,6 +57,8 @@ export function normalizeBillingState(value: unknown): BillingState {
   return {
     effectivePlan: raw.effectivePlan === "free" ? "free" : "plus",
     previewMode: raw.previewMode !== false,
+    subscriptionStatus: asSubscriptionStatus(raw.subscriptionStatus),
+    hasStripeCustomer: raw.hasStripeCustomer === true,
     activeWorkspaceId:
       typeof raw.activeWorkspaceId === "string"
         ? raw.activeWorkspaceId
@@ -41,6 +76,12 @@ export function normalizeBillingState(value: unknown): BillingState {
         ? raw.activeSelectionGraceUntil
         : null,
   };
+}
+
+export function hasLivePlusSubscription(status: SubscriptionStatus) {
+  return (
+    status === "active" || status === "trialing" || status === "past_due"
+  );
 }
 
 export function canSwitchActiveStory(

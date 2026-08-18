@@ -4,6 +4,7 @@ import {
   canCreateProject,
   canUseFeature,
   getPlanAccess,
+  planAccessFromBilling,
   planLimitMessage,
 } from "./plan";
 
@@ -41,6 +42,12 @@ describe("plan access", () => {
     const access = getPlanAccess({ unlockPaid: false, subscribed: true });
     expect(canUseFeature("aiAsk", access)).toBe(true);
     expect(canCreatePage(200, access)).toBe(true);
+  });
+
+  it("keeps paid features locked unless the account is Plus", () => {
+    expect(getPlanAccess().isPaid).toBe(false);
+    expect(planAccessFromBilling("free").isPaid).toBe(false);
+    expect(planAccessFromBilling("plus").isPaid).toBe(true);
   });
 
   it("explains the free story limit", () => {

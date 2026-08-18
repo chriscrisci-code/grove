@@ -1,3 +1,4 @@
+import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -34,6 +35,38 @@ export async function DELETE() {
       { error: "Story images could not be removed. Please try again." },
       { status: 500 },
     );
+  }
+
+  if (isStripeConfigured()) {
+    const { data: billing } = await supabase
+      .from("user_billing")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const customerId = billing?.stripe_customer_id;
+    if (customerId) {
+      try {
+        const stripe = getStripe();
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customerId,
+          status: "all",
+        });
+        await Promise.all(
+          subscriptions.data
+            .filter((subscription) =>
+              ["active", "trialing", "past_due", "unpaid"].includes(
+                subscription.status,
+              ),
+            )
+            .map((subscription) => stripe.subscriptions.cancel(subscription.id)),
+        );
+      } catch {
+        return Response.json(
+          { error: "Your subscription could not be canceled. Please try again." },
+          { status: 500 },
+        );
+      }
+    }
   }
 
   const { error } = await supabase.rpc("delete_my_account");

@@ -45,6 +45,7 @@ import {
 import { ResearchView } from "@/features/research/research-view";
 import { ManuscriptPreview } from "@/features/workspace/manuscript-preview";
 import { HelpDialog } from "@/features/workspace/help-dialog";
+import { CHANGELOG } from "@/features/workspace/changelog";
 import { createClient } from "@/lib/supabase/client";
 import {
   applyPageDrop,
@@ -2490,6 +2491,7 @@ function SettingsDialog({
   const [nextKey, setNextKey] = useState(apiKey);
   const [newPassword, setNewPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [pane, setPane] = useState<"connection" | "changelog">("connection");
   const models: Record<AiProvider, string[]> = {
     openai: ["gpt-5-mini", "gpt-5.2", "gpt-4.1"],
     anthropic: ["claude-sonnet-4-6", "claude-opus-4-6"],
@@ -2508,6 +2510,24 @@ function SettingsDialog({
           <div>
             <span className="eyebrow">SETTINGS</span>
             <h2 id="settings-title">Settings</h2>
+            <div className="settings-panes" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pane === "connection"}
+                onClick={() => setPane("connection")}
+              >
+                Connection
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={pane === "changelog"}
+                onClick={() => setPane("changelog")}
+              >
+                Changelog
+              </button>
+            </div>
           </div>
           <button
             type="button"
@@ -2519,6 +2539,21 @@ function SettingsDialog({
           </button>
         </header>
         <div className="settings-content">
+          {pane === "changelog" ? (
+            <div className="changelog">
+              {CHANGELOG.map((group) => (
+                <section key={group.date} className="changelog-group">
+                  <h3>{group.date}</h3>
+                  <ul>
+                    {group.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <>
           {onSetPassword && (
             <section className="settings-section">
               <div>
@@ -2606,7 +2641,10 @@ function SettingsDialog({
               : "Your key stays in memory and disappears when the tab closes."}
           </p>
           </section>
+            </>
+          )}
         </div>
+        {pane === "connection" && (
         <footer>
           <button type="button" className="secondary-button" onClick={onClose}>
             Cancel
@@ -2619,6 +2657,7 @@ function SettingsDialog({
             Save connection
           </button>
         </footer>
+        )}
       </section>
     </div>
   );

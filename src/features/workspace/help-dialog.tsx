@@ -29,6 +29,10 @@ const SECTIONS = [
     title: "Tags and relationships",
     items: [
       {
+        keys: ["title"],
+        text: "Click the title to tag or relate this page. Long titles wrap. Tag and Relate stay in the toolbar.",
+      },
+      {
         keys: ["Alt+T", "/t"],
         text: "Tag the last linked page. Click the title first to tag or relate this page instead.",
       },
@@ -64,11 +68,15 @@ const SECTIONS = [
       },
       {
         keys: ["Relationships"],
-        text: "Relationships opens on the Timeline. Place Chapters and Events there, or switch to Web and drag nodes wherever you like. Double-click the timeline to add an Event. Click a card or node to return to writing.",
+        text: "Opens on Timeline. Unused Chapters and Events sit in the tray; drag them onto a rainbow lane. Double-click empty space to add an Event. Switch to Web and drag nodes. Click a card or node to write.",
       },
       {
         keys: ["Alt+A"],
         text: "Ask AI about the current selection. Dictate turns speech into text.",
+      },
+      {
+        keys: ["Settings"],
+        text: "Connect an AI key, set a sign-in password, and open the Changelog for everything shipped so far.",
       },
     ],
   },

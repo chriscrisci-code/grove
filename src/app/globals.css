@@ -2130,6 +2130,42 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 }
 .eyebrow { color: #989a93; font-size: 9px; font-weight: 700; letter-spacing: .14em; }
 .settings-dialog h2 { margin: 5px 0 0; font: 700 25px Georgia, serif; }
+.settings-panes {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+}
+.settings-panes button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #9aa196;
+  cursor: pointer;
+  font: 650 12px/1.2 Georgia, serif;
+}
+.settings-panes button[aria-selected="true"],
+.settings-panes button:hover { color: #29322b; }
+.changelog { padding-bottom: 8px; }
+.changelog-group + .changelog-group {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.changelog-group h3 {
+  margin: 0 0 10px;
+  color: #8a927f;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.changelog-group ul {
+  margin: 0;
+  padding: 0 0 0 16px;
+  color: #4a524c;
+  font: 14px/1.55 Georgia, serif;
+}
+.changelog-group li + li { margin-top: 8px; }
 .help-dialog {
   width: min(560px, calc(100vw - 36px));
   max-height: calc(100vh - 32px);

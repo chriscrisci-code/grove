@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
+import { speechInsertDelta } from "@/features/editor/dictation";
 import {
   lookupWord,
   matchCasing,
@@ -112,9 +113,7 @@ export function StoryEditor({
   const [wordLookup, setWordLookup] = useState<WordLookup | null>(null);
   const [wordLookupLoading, setWordLookupLoading] = useState(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const committedSpeechRef = useRef(
-    new Map<number, { text: string; committedAt: number }>(),
-  );
+  const committedSpeechRef = useRef("");
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -489,7 +488,7 @@ export function StoryEditor({
     }
 
     const recognition = new Recognition();
-    committedSpeechRef.current.clear();
+    committedSpeechRef.current = "";
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
@@ -504,20 +503,21 @@ export function StoryEditor({
         const result = event.results[index];
         const transcript = result[0].transcript.trim();
         if (result.isFinal && transcript) {
-          const previous = committedSpeechRef.current.get(index);
-          const duplicate =
-            previous?.text.toLocaleLowerCase() ===
-              transcript.toLocaleLowerCase() &&
-            Date.now() - previous.committedAt < 10_000;
-          if (!duplicate) {
-            finalSegments.push(transcript);
-            committedSpeechRef.current.set(index, {
-              text: transcript,
-              committedAt: Date.now(),
-            });
+          const delta = speechInsertDelta(
+            committedSpeechRef.current,
+            transcript,
+          );
+          if (delta) {
+            finalSegments.push(delta);
+            committedSpeechRef.current = [
+              committedSpeechRef.current,
+              delta,
+            ]
+              .filter(Boolean)
+              .join(" ");
           }
-        } else {
-          interimText += transcript;
+        } else if (transcript) {
+          interimText += `${interimText ? " " : ""}${transcript}`;
         }
       }
       if (finalSegments.length) {

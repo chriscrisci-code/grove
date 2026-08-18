@@ -12,6 +12,7 @@ import {
   GitFork,
   GripVertical,
   LibraryBig,
+  ListFilter,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -59,13 +60,17 @@ import {
   applyPageDrop,
   applyPageTypeChange,
   dropPlacementFromOffset,
+  dropTargetId,
+  filterStoryPages,
   reorderAmong,
+  siblingPages,
   type PageDrop,
 } from "@/features/workspace/page-tree";
 import {
   PAGE_TYPE_FIELDS,
   PAGE_TYPE_LABELS,
   PAGE_TYPES,
+  STORY_PAGE_TYPES,
   RELATIONSHIP_SUGGESTIONS,
   normalizePageFields,
   normalizePageType,
@@ -200,6 +205,8 @@ export function Workspace({
   const [selection, setSelection] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
+  const [storyTypeFilter, setStoryTypeFilter] = useState<PageType[]>([]);
+  const [storyFilterOpen, setStoryFilterOpen] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [model, setModel] = useState("gpt-5-mini");
@@ -424,16 +431,33 @@ export function Workspace({
     pages.find((page) => page.id === tagTargetId) ?? null;
   const tagPickerPage =
     pages.find((page) => page.id === tagPickerTargetId) ?? null;
-  const filteredPages = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return query
-      ? pages.filter((page) => page.title.toLowerCase().includes(query))
-      : pages;
-  }, [pages, search]);
   const storyPages = useMemo(
-    () => filteredPages.filter((page) => page.pageType !== "chapter"),
-    [filteredPages],
+    () =>
+      filterStoryPages(
+        pages.filter((page) => page.pageType !== "chapter"),
+        { types: storyTypeFilter, query: search },
+      ),
+    [pages, search, storyTypeFilter],
   );
+  useEffect(() => {
+    if (storyTypeFilter.length === 0 && !search.trim()) return;
+    setExpanded((current) => {
+      const next = new Set(current);
+      const byId = new Map(pages.map((page) => [page.id, page]));
+      let changed = false;
+      for (const page of storyPages) {
+        let parentId = page.parentId;
+        while (parentId) {
+          if (!next.has(parentId)) {
+            next.add(parentId);
+            changed = true;
+          }
+          parentId = byId.get(parentId)?.parentId ?? null;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [pages, search, storyPages, storyTypeFilter]);
   const chapterPages = useMemo(() => {
     const chapters = pages.filter((page) => page.pageType === "chapter");
     const query = search.trim().toLowerCase();
@@ -495,18 +519,21 @@ export function Workspace({
       if (drop.type === "inside") {
         setExpanded((current) => new Set(current).add(drop.targetId));
       }
-      const target = pages.find((page) => page.id === drop.targetId);
       const dragged = pages.find((page) => page.id === draggedId);
-      if (target && dragged) {
-        setNotice(
-          drop.type === "inside"
-            ? `Moved ${dragged.title || "Untitled"} inside ${
-                target.title || "Untitled"
-              }`
-            : `Moved ${dragged.title || "Untitled"}`,
-        );
-        window.setTimeout(() => setNotice(""), 1800);
+      if (!dragged) return;
+      if (drop.type === "inside") {
+        const target = pages.find((page) => page.id === drop.targetId);
+        if (target) {
+          setNotice(
+            `Moved ${dragged.title || "Untitled"} inside ${
+              target.title || "Untitled"
+            }`,
+          );
+        }
+      } else if (drop.type === "root") {
+        setNotice(`Moved ${dragged.title || "Untitled"} to Your story`);
       }
+      window.setTimeout(() => setNotice(""), 1800);
     },
     [pages],
   );
@@ -547,24 +574,33 @@ export function Workspace({
       const node = document.elementFromPoint(event.clientX, event.clientY);
       const row = node?.closest<HTMLElement>("[data-page-id]");
       const targetId = row?.dataset.pageId;
-      if (!row || !targetId || targetId === drag.pageId) {
-        drag.drop = null;
-        setDropTarget(null);
+      const ontoRoot = Boolean(node?.closest("[data-story-root]"));
+      if (row && targetId && targetId !== drag.pageId) {
+        const drop: PageDrop = { type: "inside", targetId };
+        const preview = applyPageDrop(pages, drag.pageId, drop);
+        if (!preview) {
+          drag.drop = null;
+          setDropTarget(null);
+          return;
+        }
+        drag.drop = drop;
+        setDropTarget(drop);
         return;
       }
-      const rect = row.getBoundingClientRect();
-      const drop: PageDrop = {
-        type: dropPlacementFromOffset((event.clientY - rect.top) / rect.height),
-        targetId,
-      };
-      const preview = applyPageDrop(pages, drag.pageId, drop);
-      if (!preview) {
-        drag.drop = null;
-        setDropTarget(null);
+      if (ontoRoot) {
+        const drop: PageDrop = { type: "root" };
+        const preview = applyPageDrop(pages, drag.pageId, drop);
+        if (!preview) {
+          drag.drop = null;
+          setDropTarget(null);
+          return;
+        }
+        drag.drop = drop;
+        setDropTarget(drop);
         return;
       }
-      drag.drop = drop;
-      setDropTarget(drop);
+      drag.drop = null;
+      setDropTarget(null);
     },
     [pages],
   );
@@ -653,8 +689,9 @@ export function Workspace({
       }
       const rect = row.getBoundingClientRect();
       const drop: PageDrop = {
-        type:
-          (event.clientY - rect.top) / rect.height < 0.5 ? "before" : "after",
+        type: dropPlacementFromOffset(
+          (event.clientY - rect.top) / rect.height,
+        ),
         targetId,
       };
       drag.drop = drop;
@@ -673,7 +710,11 @@ export function Workspace({
       const pageId = drag.pageId;
       setDraggingId(null);
       setDropTarget(null);
-      if (drag.started && drop && drop.type !== "inside") {
+      if (
+        drag.started &&
+        drop &&
+        (drop.type === "before" || drop.type === "after")
+      ) {
         moveChapter(pageId, { type: drop.type, targetId: drop.targetId });
       }
     },
@@ -1121,17 +1162,63 @@ export function Workspace({
             <kbd>⌘ K</kbd>
           </div>
 
-          <div className="sidebar-label">
+          <div
+            className={`sidebar-label ${
+              dropTarget?.type === "root" ? "drop-root" : ""
+            }`}
+            data-story-root=""
+          >
             <span>Your story</span>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Create root page"
-              onClick={() => createPage()}
-            >
-              <Plus size={15} />
-            </button>
+            <div className="sidebar-label-actions">
+              <button
+                type="button"
+                className={`icon-button ${
+                  storyFilterOpen || storyTypeFilter.length ? "active" : ""
+                }`}
+                aria-label="Filter by page type"
+                aria-pressed={storyFilterOpen}
+                title="Filter by page type"
+                onClick={() => setStoryFilterOpen((current) => !current)}
+              >
+                <ListFilter size={15} />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Create root page"
+                onClick={() => createPage()}
+              >
+                <Plus size={15} />
+              </button>
+            </div>
           </div>
+          {storyFilterOpen && (
+            <div className="story-type-filter" role="group" aria-label="Page types">
+              <button
+                type="button"
+                className={storyTypeFilter.length === 0 ? "active" : ""}
+                onClick={() => setStoryTypeFilter([])}
+              >
+                All
+              </button>
+              {STORY_PAGE_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={storyTypeFilter.includes(type) ? "active" : ""}
+                  onClick={() =>
+                    setStoryTypeFilter((current) =>
+                      current.includes(type)
+                        ? current.filter((item) => item !== type)
+                        : [...current, type],
+                    )
+                  }
+                >
+                  {PAGE_TYPE_LABELS[type]}
+                </button>
+              ))}
+            </div>
+          )}
 
           <nav className="page-tree" aria-label="Story pages">
             {draggingId && dropTarget && (
@@ -1141,18 +1228,27 @@ export function Workspace({
                       pages.find((page) => page.id === dropTarget.targetId)
                         ?.title || "page"
                     }`
-                  : dropTarget.type === "before"
-                    ? `Drop before ${
-                        pages.find((page) => page.id === dropTarget.targetId)
-                          ?.title || "page"
-                      }`
-                    : `Drop after ${
-                        pages.find((page) => page.id === dropTarget.targetId)
-                          ?.title || "page"
-                      }`}
+                  : dropTarget.type === "root"
+                    ? "Drop into Your story"
+                    : dropTarget.type === "before"
+                      ? `Drop before ${
+                          pages.find((page) => page.id === dropTarget.targetId)
+                            ?.title || "page"
+                        }`
+                      : `Drop after ${
+                          pages.find((page) => page.id === dropTarget.targetId)
+                            ?.title || "page"
+                        }`}
               </div>
             )}
-            <PageBranch
+            {storyPages.length === 0 ? (
+              <p className="sidebar-empty-hint">
+                {storyTypeFilter.length || search.trim()
+                  ? "No pages match this filter."
+                  : "Add a page to start your story."}
+              </p>
+            ) : (
+              <PageBranch
               pages={storyPages}
               allPages={storyPages}
               parentId={null}
@@ -1188,6 +1284,7 @@ export function Workspace({
               onDragMove={updatePageDrag}
               onDragEnd={finishPageDrag}
             />
+            )}
           </nav>
 
           <section
@@ -1250,8 +1347,8 @@ export function Workspace({
                       } ${page.unvisited ? "unvisited" : ""} ${
                         draggingId === page.id ? "dragging" : ""
                       } ${
-                        dropTarget?.targetId === page.id
-                          ? `drop-${dropTarget.type}`
+                        dropTargetId(dropTarget) === page.id
+                          ? `drop-${dropTarget?.type}`
                           : ""
                       }`}
                     >
@@ -1999,9 +2096,7 @@ function PageBranch({
   onDragMove,
   onDragEnd,
 }: PageBranchProps) {
-  return pages
-    .filter((page) => page.parentId === parentId)
-    .map((page) => {
+  return siblingPages(pages, parentId).map((page) => {
       const hasChildren = allPages.some((child) => child.parentId === page.id);
       return (
         <div key={page.id}>
@@ -2010,15 +2105,17 @@ function PageBranch({
             className={`page-row ${activeId === page.id ? "active" : ""} ${
               page.unvisited ? "unvisited" : ""
             } ${draggingId === page.id ? "dragging" : ""} ${
-              dropTarget?.targetId === page.id ? `drop-${dropTarget.type}` : ""
+              dropTargetId(dropTarget) === page.id
+                ? `drop-${dropTarget?.type}`
+                : ""
             }`}
           >
             {canDrag && (
               <button
                 type="button"
                 className="page-drag-handle"
-                aria-label={`Reorder ${page.title || "Untitled"}`}
-                title="Drag to reorder or nest"
+                aria-label={`Nest ${page.title || "Untitled"}`}
+                title="Drag onto a page to nest, or onto Your story to un-nest"
                 onPointerDown={(event) => onDragStart(event, page.id)}
                 onPointerMove={onDragMove}
                 onPointerUp={onDragEnd}

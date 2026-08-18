@@ -11,6 +11,10 @@ export const PAGE_TYPES = [
 
 export type PageType = (typeof PAGE_TYPES)[number];
 
+export const STORY_PAGE_TYPES = PAGE_TYPES.filter(
+  (type): type is Exclude<PageType, "chapter"> => type !== "chapter",
+);
+
 export type PageFieldDef = {
   key: string;
   label: string;

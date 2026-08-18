@@ -102,7 +102,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["+"],
-        text: "The sidebar plus on a page creates a subpage. The plus beside Your story creates a top-level page.",
+        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. Pages list A to Z, with subpages under their parent. Drag onto a title to nest, or onto Your story to un-nest. Filter by page type.",
       },
       {
         keys: ["Research"],

@@ -56,6 +56,35 @@ const SECTIONS = [
     ],
   },
   {
+    title: "Timeline",
+    items: [
+      {
+        keys: ["Time"],
+        text: "Down the board is later. The arrow labeled Time is that direction.",
+      },
+      {
+        keys: ["Tray"],
+        text: "Unused Chapters and Events wait here. Click one to place it after the last card, or drag it onto a rainbow lane.",
+      },
+      {
+        keys: ["Lanes"],
+        text: "Six colored lines. Cards snap to a line; the dot on top of a card is which line it is on. Overlap with a neighbor is fine.",
+      },
+      {
+        keys: ["Move"],
+        text: "Drag a card up or down to change when it happens, or sideways to change lanes. Click a card to open that page. The X, or a drag back to the tray, takes it off the Timeline.",
+      },
+      {
+        keys: ["double-click"],
+        text: "Empty space creates a new Event there and lets you title it immediately. Nesting that Event in Your story does not move it on the Timeline.",
+      },
+      {
+        keys: ["scroll"],
+        text: "Scroll near the bottom to grow more time downward.",
+      },
+    ],
+  },
+  {
     title: "Sidebar and modes",
     items: [
       {
@@ -68,7 +97,7 @@ const SECTIONS = [
       },
       {
         keys: ["Relationships"],
-        text: "Opens on Timeline. Unused Chapters and Events sit in the tray; drag them onto a rainbow lane. Double-click empty space to add an Event. Switch to Web and drag nodes. Click a card or node to write.",
+        text: "Opens on Timeline. Switch to Web and drag nodes wherever you like. Click a card or node to write.",
       },
       {
         keys: ["Alt+A"],

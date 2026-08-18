@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
+  Clapperboard,
   FileText,
   GitFork,
   GripVertical,
@@ -93,6 +94,7 @@ import {
   PAGE_TYPE_LABELS,
   PAGE_TYPES,
   STORY_PAGE_TYPES,
+  isSidebarListType,
   FAMILY_RELATIONSHIP_LABELS,
   RELATIONSHIP_SUGGESTIONS,
   normalizePageFields,
@@ -250,7 +252,10 @@ export function Workspace({
     toId?: string;
   } | null>(null);
   const [chaptersOpen, setChaptersOpen] = useState(true);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [scriptsOpen, setScriptsOpen] = useState(true);
+  const [exportKind, setExportKind] = useState<"chapter" | "script" | null>(
+    null,
+  );
   const [relationshipsOpen, setRelationshipsOpen] = useState(false);
   const [activeId, setActiveId] = useState(startingPages[0]?.id ?? "welcome");
   const [expanded, setExpanded] = useState<Set<string>>(
@@ -301,6 +306,7 @@ export function Workspace({
     startX: number;
     startY: number;
     drop: PageDrop | null;
+    list?: "chapter" | "script";
   } | null>(null);
 
   useEffect(() => {
@@ -646,7 +652,7 @@ export function Workspace({
   const storyPages = useMemo(
     () =>
       filterStoryPages(
-        pages.filter((page) => page.pageType !== "chapter"),
+        pages.filter((page) => !isSidebarListType(page.pageType)),
         { types: storyTypeFilter, query: search },
       ),
     [pages, search, storyTypeFilter],
@@ -677,6 +683,13 @@ export function Workspace({
       ? chapters.filter((page) => page.title.toLowerCase().includes(query))
       : chapters;
   }, [pages, search]);
+  const scriptPages = useMemo(() => {
+    const scripts = pages.filter((page) => page.pageType === "script");
+    const query = search.trim().toLowerCase();
+    return query
+      ? scripts.filter((page) => page.title.toLowerCase().includes(query))
+      : scripts;
+  }, [pages, search]);
   const activeRelations = useMemo(
     () =>
       relationships.filter(
@@ -704,7 +717,7 @@ export function Workspace({
       }
       const page: StoryPage = {
         id: makeId(),
-        parentId: pageType === "chapter" ? null : parentId,
+        parentId: isSidebarListType(pageType) ? null : parentId,
         title,
         content: "<p></p>",
         pageType,
@@ -714,6 +727,7 @@ export function Workspace({
       };
       setPages((current) => [...current, page]);
       if (pageType === "chapter") setChaptersOpen(true);
+      if (pageType === "script") setScriptsOpen(true);
       if (parentId) {
         setExpanded((current) => new Set(current).add(parentId));
       }
@@ -840,26 +854,30 @@ export function Workspace({
     [movePage],
   );
 
-  const moveChapter = useCallback(
-    (draggedId: string, drop: { type: "before" | "after"; targetId: string }) => {
+  const moveListPage = useCallback(
+    (
+      listType: "chapter" | "script",
+      draggedId: string,
+      drop: { type: "before" | "after"; targetId: string },
+    ) => {
       if (readOnly) {
         blockReadOnly();
         return;
       }
       setPages((current) => {
-        const remainingChapters = current.filter(
-          (page) => page.pageType === "chapter" && page.id !== draggedId,
+        const remaining = current.filter(
+          (page) => page.pageType === listType && page.id !== draggedId,
         );
-        const targetIndex = remainingChapters.findIndex(
+        const targetIndex = remaining.findIndex(
           (page) => page.id === drop.targetId,
         );
         const beforeId =
           drop.type === "before"
             ? drop.targetId
-            : remainingChapters[targetIndex + 1]?.id ?? null;
+            : remaining[targetIndex + 1]?.id ?? null;
         return reorderAmong(
           current,
-          (page) => page.pageType === "chapter",
+          (page) => page.pageType === listType,
           draggedId,
           beforeId,
         ).map((page) =>
@@ -870,8 +888,12 @@ export function Workspace({
     [blockReadOnly, readOnly],
   );
 
-  const startChapterDrag = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>, pageId: string) => {
+  const startListDrag = useCallback(
+    (
+      event: ReactPointerEvent<HTMLButtonElement>,
+      pageId: string,
+      list: "chapter" | "script",
+    ) => {
       if (readOnly || search.trim() || sidebarWidth < 112) return;
       event.preventDefault();
       event.stopPropagation();
@@ -883,12 +905,13 @@ export function Workspace({
         startX: event.clientX,
         startY: event.clientY,
         drop: null,
+        list,
       };
     },
     [readOnly, search, sidebarWidth],
   );
 
-  const updateChapterDrag = useCallback(
+  const updateListDrag = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       const drag = pageDragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
@@ -904,8 +927,11 @@ export function Workspace({
         document.body.classList.add("dragging-pages");
       }
       const node = document.elementFromPoint(event.clientX, event.clientY);
-      const row = node?.closest<HTMLElement>("[data-chapter-id]");
-      const targetId = row?.dataset.chapterId;
+      const selector =
+        drag.list === "script" ? "[data-script-id]" : "[data-chapter-id]";
+      const row = node?.closest<HTMLElement>(selector);
+      const targetId =
+        drag.list === "script" ? row?.dataset.scriptId : row?.dataset.chapterId;
       if (!row || !targetId || targetId === drag.pageId) {
         drag.drop = null;
         setDropTarget(null);
@@ -924,10 +950,11 @@ export function Workspace({
     [],
   );
 
-  const finishChapterDrag = useCallback(
+  const finishListDrag = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       const drag = pageDragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
+      const list = drag.list;
       pageDragRef.current = null;
       document.body.classList.remove("dragging-pages");
       const drop = drag.drop;
@@ -936,13 +963,14 @@ export function Workspace({
       setDropTarget(null);
       if (
         drag.started &&
+        list &&
         drop &&
         (drop.type === "before" || drop.type === "after")
       ) {
-        moveChapter(pageId, { type: drop.type, targetId: drop.targetId });
+        moveListPage(list, pageId, { type: drop.type, targetId: drop.targetId });
       }
     },
-    [moveChapter],
+    [moveListPage],
   );
 
   const createLinkedPage = useCallback(
@@ -1142,7 +1170,10 @@ export function Workspace({
       }),
     );
     if (pageType === "chapter") setChaptersOpen(true);
-    if (pageType === "script") setEditorNonce((current) => current + 1);
+    if (pageType === "script") {
+      setScriptsOpen(true);
+      setEditorNonce((current) => current + 1);
+    }
   }, [blockReadOnly, readOnly]);
 
   const importChapterIntoScript = useCallback(
@@ -1751,7 +1782,7 @@ export function Workspace({
                     denyPlan("chapterPdf");
                     return;
                   }
-                  setExportOpen(true);
+                  setExportKind("chapter");
                 }}
               >
                 <Printer size={15} />
@@ -1785,12 +1816,12 @@ export function Workspace({
                           aria-label={`Reorder ${page.title || "Untitled"}`}
                           title="Drag to set export order"
                           onPointerDown={(event) =>
-                            startChapterDrag(event, page.id)
+                            startListDrag(event, page.id, "chapter")
                           }
-                          onPointerMove={updateChapterDrag}
-                          onPointerUp={finishChapterDrag}
-                          onPointerCancel={finishChapterDrag}
-                          onLostPointerCapture={finishChapterDrag}
+                          onPointerMove={updateListDrag}
+                          onPointerUp={finishListDrag}
+                          onPointerCancel={finishListDrag}
+                          onLostPointerCapture={finishListDrag}
                         >
                           <GripVertical size={13} />
                         </button>
@@ -1830,6 +1861,136 @@ export function Workspace({
                         className="row-delete"
                         aria-label={`Delete ${page.title}`}
                         title="Delete chapter"
+                        onClick={() => deletePage(page.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </nav>
+            )}
+          </section>
+
+          <section
+            className={`sidebar-chapters ${scriptsOpen ? "open" : "collapsed"}`}
+          >
+            <div className="chapter-section-heading">
+              <button
+                type="button"
+                className="tag-section-heading"
+                aria-expanded={scriptsOpen}
+                onClick={() => setScriptsOpen((current) => !current)}
+              >
+                {scriptsOpen ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
+                )}
+                <Clapperboard size={14} />
+                <span>Scripts</span>
+                <small>{scriptPages.length}</small>
+              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Create script"
+                  title="Create script"
+                  onClick={() => createPage(null, "Untitled", true, "script")}
+                >
+                  <Plus size={15} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="icon-button chapter-export"
+                aria-label="Export script"
+                title="Print scripts as PDF"
+                onClick={() => {
+                  if (!canUseFeature("chapterPdf")) {
+                    denyPlan("chapterPdf");
+                    return;
+                  }
+                  setExportKind("script");
+                }}
+              >
+                <Printer size={15} />
+              </button>
+            </div>
+            {scriptsOpen && (
+              <nav className="sidebar-chapter-list" aria-label="Scripts">
+                {scriptPages.length === 0 ? (
+                  <p className="sidebar-empty-hint">
+                    Set a page type to Script, or add one here.
+                  </p>
+                ) : (
+                  scriptPages.map((page) => (
+                    <div
+                      key={page.id}
+                      data-script-id={page.id}
+                      className={`page-row ${
+                        activeId === page.id ? "active" : ""
+                      } ${page.unvisited ? "unvisited" : ""} ${
+                        draggingId === page.id ? "dragging" : ""
+                      } ${
+                        dropTargetId(dropTarget) === page.id
+                          ? `drop-${dropTarget?.type}`
+                          : ""
+                      }`}
+                    >
+                      {sidebarMode !== "rail" && !search.trim() && (
+                        <button
+                          type="button"
+                          className="page-drag-handle"
+                          aria-label={`Reorder ${page.title || "Untitled"}`}
+                          title="Drag to set export order"
+                          onPointerDown={(event) =>
+                            startListDrag(event, page.id, "script")
+                          }
+                          onPointerMove={updateListDrag}
+                          onPointerUp={finishListDrag}
+                          onPointerCancel={finishListDrag}
+                          onLostPointerCapture={finishListDrag}
+                        >
+                          <GripVertical size={13} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="page-name"
+                        data-initial={(page.title || "Untitled")
+                          .charAt(0)
+                          .toUpperCase()}
+                        title={page.title || "Untitled"}
+                        onClick={() => {
+                          setActiveId(page.id);
+                          setTagTargetId(null);
+                          setTagPickerTargetId(null);
+                          setPages((current) =>
+                            current.map((candidate) =>
+                              candidate.id === page.id && candidate.unvisited
+                                ? { ...candidate, unvisited: false }
+                                : candidate,
+                            ),
+                          );
+                          if (isNarrow) setSidebarOpen(false);
+                        }}
+                      >
+                        <Clapperboard size={15} />
+                        {page.unvisited && (
+                          <span
+                            className="unvisited-page-dot"
+                            title="New page"
+                          />
+                        )}
+                        <span>{page.title || "Untitled"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="row-delete"
+                        aria-label={`Delete ${page.title}`}
+                        title="Delete script"
                         onClick={() => deletePage(page.id)}
                       >
                         <Trash2 size={13} />
@@ -2707,17 +2868,22 @@ export function Workspace({
         />
       )}
 
-      {exportOpen && (
+      {exportKind && (
         <ManuscriptPreview
           projectTitle={workspaceName}
+          kind={exportKind === "script" ? "script" : "manuscript"}
           chapters={pages
-            .filter((page) => page.pageType === "chapter")
+            .filter((page) =>
+              exportKind === "script"
+                ? page.pageType === "script"
+                : page.pageType === "chapter",
+            )
             .map((page) => ({
               id: page.id,
               title: page.title,
               content: page.content,
             }))}
-          onClose={() => setExportOpen(false)}
+          onClose={() => setExportKind(null)}
         />
       )}
 

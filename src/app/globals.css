@@ -2677,6 +2677,35 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   font: 16px/1.75 Georgia, serif;
 }
 .manuscript-body p { margin: 0 0 1em; }
+.script-manuscript h1,
+.script-manuscript .manuscript-chapter h2 {
+  font-family: "Courier New", Courier, ui-monospace, monospace;
+}
+.script-body {
+  font: 13.5px/1.4 "Courier New", Courier, ui-monospace, monospace;
+}
+.script-body p { margin: 0 0 .85em; }
+.script-body p[data-script="scene"] {
+  margin-top: 1.3em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.script-body p[data-script="character"] {
+  margin: 1em 0 0 34%;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.script-body p[data-script="parenthetical"] {
+  margin: 0 24% .1em 28%;
+}
+.script-body p[data-script="dialogue"] {
+  margin: 0 16% .9em 20%;
+}
+.script-body p[data-script="transition"] {
+  text-align: right;
+  font-weight: 700;
+  text-transform: uppercase;
+}
 .research-search {
   display: flex;
   width: min(980px, 100%);

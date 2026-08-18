@@ -60,7 +60,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["Type"],
-        text: "Set a page to Script, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events and Scripts stay in Your story and can nest like other pages.",
+        text: "Set a page to Script, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events stay in Your story. Scripts live in the Scripts list, like Chapters.",
       },
       {
         keys: ["Chapters"],
@@ -73,7 +73,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["Import"],
-        text: "On a Script page, Import a chapter copies that chapter here as a first-pass screenplay. The chapter is not overwritten.",
+        text: "On a Script page, Import a chapter copies that chapter here as a first-pass screenplay. The chapter is not overwritten. Scripts live in the Scripts list under Chapters; drag order is print order, and the printer icon prints them as a screenplay PDF.",
       },
       {
         keys: ["Tab", "Enter"],
@@ -123,7 +123,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["+"],
-        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. Pages list A to Z, with subpages under their parent. Drag onto a title to nest, or onto Your story to un-nest. Filter by page type.",
+        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. The plus beside Chapters or Scripts adds to that list. Pages list A to Z, with subpages under their parent. Drag onto a title to nest, or onto Your story to un-nest. Filter by page type.",
       },
       {
         keys: ["Research"],

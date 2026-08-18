@@ -29,6 +29,13 @@ describe("page types and chapter order", () => {
     expect(next.find((page) => page.id === "mara")?.parentId).toBeNull();
   });
 
+  it("moves a page to scripts and reparents its children", () => {
+    const next = applyPageTypeChange(pages, "notes", "script");
+    expect(next.find((page) => page.id === "notes")?.pageType).toBe("script");
+    expect(next.find((page) => page.id === "notes")?.parentId).toBeNull();
+    expect(next.find((page) => page.id === "mara")?.parentId).toBeNull();
+  });
+
   it("returns a chapter to the page tree as a root", () => {
     const next = applyPageTypeChange(
       applyPageTypeChange(pages, "mara", "chapter"),
@@ -58,10 +65,10 @@ describe("page types and chapter order", () => {
     expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
   });
 
-  it("keeps a script nested in the page tree", () => {
+  it("keeps a script in its own list, not nested in Your story", () => {
     const next = applyPageTypeChange(pages, "mara", "script");
     expect(next.find((page) => page.id === "mara")?.pageType).toBe("script");
-    expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
+    expect(next.find((page) => page.id === "mara")?.parentId).toBeNull();
   });
 
   it("splits also-known-as names on commas", () => {

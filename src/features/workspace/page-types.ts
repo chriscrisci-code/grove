@@ -13,8 +13,15 @@ export const PAGE_TYPES = [
 export type PageType = (typeof PAGE_TYPES)[number];
 
 export const STORY_PAGE_TYPES = PAGE_TYPES.filter(
-  (type): type is Exclude<PageType, "chapter"> => type !== "chapter",
+  (type): type is Exclude<PageType, "chapter" | "script"> =>
+    type !== "chapter" && type !== "script",
 );
+
+export function isSidebarListType(
+  value: string,
+): value is "chapter" | "script" {
+  return value === "chapter" || value === "script";
+}
 
 export type PageFieldDef = {
   key: string;

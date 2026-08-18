@@ -167,17 +167,20 @@ export function reorderAmong<T extends { id: string }>(
 export function applyPageTypeChange<
   T extends { id: string; parentId: string | null; pageType: string },
 >(pages: T[], pageId: string, pageType: string): T[] {
+  const enteringList = pageType === "chapter" || pageType === "script";
   return pages.map((page) => {
     if (page.id === pageId) {
-      const leavingOrEnteringChapter =
-        pageType === "chapter" || page.pageType === "chapter";
+      const leavingOrEnteringList =
+        enteringList ||
+        page.pageType === "chapter" ||
+        page.pageType === "script";
       return {
         ...page,
         pageType,
-        parentId: leavingOrEnteringChapter ? null : page.parentId,
+        parentId: leavingOrEnteringList ? null : page.parentId,
       };
     }
-    if (pageType === "chapter" && page.parentId === pageId) {
+    if (enteringList && page.parentId === pageId) {
       return { ...page, parentId: null };
     }
     return page;

@@ -5,14 +5,17 @@ import { Printer, X } from "lucide-react";
 type ManuscriptPreviewProps = {
   projectTitle: string;
   chapters: { id: string; title: string; content: string }[];
+  kind?: "manuscript" | "script";
   onClose: () => void;
 };
 
 export function ManuscriptPreview({
   projectTitle,
   chapters,
+  kind = "manuscript",
   onClose,
 }: ManuscriptPreviewProps) {
+  const isScript = kind === "script";
   return (
     <div className="manuscript-preview">
       <div className="manuscript-toolbar">
@@ -25,10 +28,14 @@ export function ManuscriptPreview({
           Back to writing
         </button>
       </div>
-      <article className="manuscript">
+      <article className={`manuscript ${isScript ? "script-manuscript" : ""}`}>
         <h1>{projectTitle}</h1>
         {chapters.length === 0 ? (
-          <p>No chapters yet. Set a page type to Chapter to include it here.</p>
+          <p>
+            {isScript
+              ? "No scripts yet. Set a page type to Script to include it here."
+              : "No chapters yet. Set a page type to Chapter to include it here."}
+          </p>
         ) : (
           chapters.map((chapter, index) => (
             <section key={chapter.id} className="manuscript-chapter">
@@ -36,7 +43,7 @@ export function ManuscriptPreview({
                 {index + 1}. {chapter.title || "Untitled"}
               </h2>
               <div
-                className="manuscript-body"
+                className={`manuscript-body ${isScript ? "script-body" : ""}`}
                 dangerouslySetInnerHTML={{ __html: chapter.content }}
               />
             </section>

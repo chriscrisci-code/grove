@@ -2,6 +2,7 @@ export const CHANGELOG = [
   {
     date: "August 17, 2026",
     items: [
+      "Right-click a word for synonyms and similar words, and spelling fixes when it is misspelled.",
       "Relationships opens on Timeline. Web is the second tab; drag nodes wherever you like.",
       "Timeline cards wrap, sit on rainbow lanes, and show a colored snap dot.",
       "Place Chapters and Events from a tray, drag them through time, or double-click to create an Event.",

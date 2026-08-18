@@ -20,6 +20,14 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
+import {
+  lookupWord,
+  matchCasing,
+  wordRangeAt,
+  type WordLookup,
+  type WordRange,
+} from "@/features/editor/word-lookup";
+import { WordMenu } from "@/features/editor/word-menu";
 
 type SpeechResult = {
   isFinal: boolean;
@@ -98,6 +106,11 @@ export function StoryEditor({
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [dictationStatus, setDictationStatus] = useState("");
+  const [wordMenu, setWordMenu] = useState<(WordRange & { x: number; y: number }) | null>(
+    null,
+  );
+  const [wordLookup, setWordLookup] = useState<WordLookup | null>(null);
+  const [wordLookupLoading, setWordLookupLoading] = useState(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const committedSpeechRef = useRef(
     new Map<number, { text: string; committedAt: number }>(),
@@ -315,6 +328,56 @@ export function StoryEditor({
     },
     [currentPageId, editor, linkablePages, onFindLinks],
   );
+
+  useEffect(() => {
+    if (!editor) return;
+    const currentEditor = editor;
+    const dom = currentEditor.view.dom;
+    function onContextMenu(event: MouseEvent) {
+      const pos = currentEditor.view.posAtCoords({
+        left: event.clientX,
+        top: event.clientY,
+      });
+      if (!pos) return;
+      const $pos = currentEditor.state.doc.resolve(pos.pos);
+      const parentStart = $pos.start();
+      const found = wordRangeAt($pos.parent.textContent, $pos.parentOffset);
+      if (!found) return;
+      event.preventDefault();
+      setWordLookup(null);
+      setWordLookupLoading(true);
+      setWordMenu({
+        from: parentStart + found.start,
+        to: parentStart + found.end,
+        word: found.word,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    }
+    dom.addEventListener("contextmenu", onContextMenu);
+    return () => dom.removeEventListener("contextmenu", onContextMenu);
+  }, [editor]);
+
+  useEffect(() => {
+    if (!wordMenu) return;
+    const word = wordMenu.word;
+    let cancelled = false;
+    setWordLookupLoading(true);
+    void lookupWord(word)
+      .then((result) => {
+        if (cancelled) return;
+        setWordLookup(result);
+        setWordLookupLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setWordLookup({ corrections: [], synonyms: [], related: [] });
+        setWordLookupLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wordMenu]);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -668,6 +731,27 @@ export function StoryEditor({
       >
         <EditorContent editor={editor} />
       </div>
+      {wordMenu && (
+        <WordMenu
+          word={wordMenu.word}
+          x={wordMenu.x}
+          y={wordMenu.y}
+          loading={wordLookupLoading}
+          lookup={wordLookup}
+          onClose={() => setWordMenu(null)}
+          onPick={(next) => {
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(
+                { from: wordMenu.from, to: wordMenu.to },
+                matchCasing(wordMenu.word, next),
+              )
+              .run();
+            setWordMenu(null);
+          }}
+        />
+      )}
     </div>
   );
 }

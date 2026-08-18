@@ -9,6 +9,15 @@ type HelpDialogProps = {
 
 const SECTIONS = [
   {
+    title: "Writing",
+    items: [
+      {
+        keys: ["right-click"],
+        text: "A misspelled word with a red underline shows spelling fixes. Every word also shows synonyms and similar words. Click one to replace it.",
+      },
+    ],
+  },
+  {
     title: "Linked pages",
     items: [
       {

@@ -70,11 +70,12 @@ type BrowserSpeechRecognition = {
 
 type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
 
-declare global {
-  interface Window {
+function speechRecognitionEngine() {
+  const speechWindow = window as Window & {
     SpeechRecognition?: SpeechRecognitionConstructor;
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
+  };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
 }
 
 const ScriptParagraph = Paragraph.extend({
@@ -254,11 +255,7 @@ export function ScriptEditor({
   }, [editor, readOnly]);
 
   useEffect(() => {
-    queueMicrotask(() =>
-      setSpeechSupported(
-        Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
-      ),
-    );
+    queueMicrotask(() => setSpeechSupported(Boolean(speechRecognitionEngine())));
     return () => {
       listeningIntentRef.current = false;
       if (restartTimerRef.current != null) {
@@ -268,11 +265,13 @@ export function ScriptEditor({
     };
   }, []);
 
-  const elementState = useEditorState({
-    editor,
-    selector: ({ editor: currentEditor }) =>
-      normalizeScriptElement(currentEditor?.getAttributes("paragraph").script),
-  });
+  const elementState = normalizeScriptElement(
+    useEditorState({
+      editor,
+      selector: ({ editor: currentEditor }) =>
+        currentEditor?.getAttributes("paragraph").script as string | undefined,
+    }),
+  );
 
   const recentCharacters = useMemo(
     () => (editor ? collectCharacterNamesFromHtml(editor.getHTML()) : []),
@@ -661,8 +660,7 @@ export function ScriptEditor({
       setDictationStatus("Finishing dictation…");
       return;
     }
-    const Recognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const Recognition = speechRecognitionEngine();
     if (!Recognition) {
       setDictationStatus(
         "Voice typing is not supported by this browser. Try Chrome or Edge.",
@@ -781,6 +779,7 @@ export function ScriptEditor({
   }
 
   function startWriting() {
+    if (!editor) return;
     setStarted(true);
     const next = cycleSluglinePrefix("");
     replaceCurrentBlock(editor, next.text, "scene", next.caret);

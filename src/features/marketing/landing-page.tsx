@@ -5,7 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
-  Clock3,
+  Clapperboard,
   FilePlus2,
   FileText,
   GitFork,
@@ -13,55 +13,16 @@ import {
   LibraryBig,
   Link2,
   Mic,
-  Network,
   Plus,
   Printer,
   Search,
   Settings,
   Sparkles,
   Tags,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
+import { GROVE_FEATURES } from "@/features/marketing/grove-features";
 import { MarketingShell } from "@/features/marketing/marketing-shell";
-
-const FEATURES = [
-  {
-    icon: BookOpen,
-    title: "Write the manuscript",
-    text: "Keep chapters in order, move between scenes instantly, and print a clean chapter PDF when it is time to share.",
-  },
-  {
-    icon: Network,
-    title: "Connect every name",
-    text: "Turn characters, places, objects, and ideas into linked pages without leaving the paragraph you are writing.",
-  },
-  {
-    icon: Clock3,
-    title: "See the timeline",
-    text: "Place chapters and events on a visual timeline so parallel plots and cause-and-effect stay clear.",
-  },
-  {
-    icon: GitFork,
-    title: "Understand relationships",
-    text: "Map named connections in the relationship web and build a family tree from your Character pages.",
-  },
-  {
-    icon: Tags,
-    title: "Organize your world",
-    text: "Use page types, aliases, nested pages, and colored tags to find the right detail when you need it.",
-  },
-  {
-    icon: Search,
-    title: "Research beside the story",
-    text: "Find and save sources in the same workspace as the page they inform instead of losing them in another app.",
-  },
-  {
-    icon: Users,
-    title: "Share with a reviewer",
-    text: "Invite a beta reader or editor to comment and suggest. One person writes at a time, so drafts are never overwritten.",
-  },
-];
 
 export function LandingPage() {
   return (
@@ -72,15 +33,16 @@ export function LandingPage() {
             <span className="eyebrow">A CONNECTED WRITING SPACE</span>
             <h1>Keep your whole story connected.</h1>
             <p>
-              Write chapters while organizing characters, places, timelines,
-              relationships, research, and ideas in one living story workspace.
+              Write chapters, tend the world beside them, and open a Script
+              page when a scene needs to look like a screenplay—all in one
+              living workspace.
             </p>
             <div className="marketing-cta-row">
               <Link href="/sign-up" className="marketing-primary-cta">
                 Start writing free
                 <ArrowRight size={17} />
               </Link>
-              <Link href="#how-it-works" className="marketing-secondary-cta">
+              <Link href="/features" className="marketing-secondary-cta">
                 See how Grove works
               </Link>
             </div>
@@ -92,12 +54,13 @@ export function LandingPage() {
         <section className="marketing-problem" id="how-it-works">
           <span className="eyebrow">ONE PLACE FOR THE WHOLE STORY</span>
           <h2>
-            Your manuscript, character notes, timelines, and research should
-            not live in five different places.
+            Your manuscript, world notes, and scripts should not live in five
+            different places.
           </h2>
           <p>
             Grove keeps the page you are writing connected to the world behind
-            it—without turning your creative work into a spreadsheet.
+            it—and includes a dedicated script format when the work needs to
+            look like a screenplay.
           </p>
         </section>
 
@@ -105,7 +68,10 @@ export function LandingPage() {
           <article>
             <span>01</span>
             <h3>Write</h3>
-            <p>A calm editor keeps the current sentence at the center.</p>
+            <p>
+              A calm editor for chapters, and a script format when the scene
+              should look like a screenplay.
+            </p>
           </article>
           <article>
             <span>02</span>
@@ -127,11 +93,12 @@ export function LandingPage() {
             </div>
             <p>
               Grove grows from a blank page into a story reference you can
-              actually use while drafting.
+              actually use while drafting—chapters, world pages, and script
+              format included.
             </p>
           </div>
           <div className="marketing-feature-grid">
-            {FEATURES.map((feature) => {
+            {GROVE_FEATURES.map((feature) => {
               const Icon = feature.icon;
               return (
                 <article key={feature.title} className="marketing-feature-card">
@@ -139,11 +106,14 @@ export function LandingPage() {
                     <Icon size={19} />
                   </span>
                   <h3>{feature.title}</h3>
-                  <p>{feature.text}</p>
+                  <p>{feature.summary}</p>
                 </article>
               );
             })}
           </div>
+          <p className="marketing-features-more">
+            <Link href="/features">Read the full list of Grove features</Link>
+          </p>
         </section>
 
         <section className="marketing-ai-note">
@@ -171,7 +141,7 @@ export function LandingPage() {
           </blockquote>
           <div className="marketing-audience-icons" aria-hidden="true">
             <BookOpen size={22} />
-            <GitFork size={22} />
+            <Clapperboard size={22} />
             <Printer size={22} />
           </div>
         </section>
@@ -249,13 +219,23 @@ function ProductPreview() {
           <ChevronDown size={9} />
           <BookOpen size={10} />
           <strong>Chapters</strong>
-          <small>3</small>
+          <small>2</small>
         </div>
         <div className="marketing-app-chapters">
           <span>1</span>
           <span>The Watchtower</span>
           <span>2</span>
           <span>First Snow</span>
+        </div>
+        <div className="marketing-app-sidebar-group">
+          <ChevronDown size={9} />
+          <Clapperboard size={10} />
+          <strong>Scripts</strong>
+          <small>1</small>
+        </div>
+        <div className="marketing-app-chapters">
+          <span>1</span>
+          <span>Watchtower Night</span>
         </div>
         <div className="marketing-app-sidebar-group tags">
           <ChevronRight size={9} />

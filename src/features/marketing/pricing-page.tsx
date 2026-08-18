@@ -6,6 +6,7 @@ const FREE_FEATURES = [
   "1 story",
   "Up to 50 pages",
   "Writing editor and linked pages",
+  "Dedicated script format",
   "Page types, aliases, and colored tags",
   "Timeline, relationship web, and family tree",
   "Project cover and night colors",
@@ -19,7 +20,7 @@ const PLUS_FEATURES = [
   "Invite reviewers or editors",
   "Page comments and text suggestions",
   "Ask AI with your own provider key",
-  "Chapter PDF export",
+  "Chapter and script PDF export",
   "Future premium planning tools",
 ];
 
@@ -139,8 +140,8 @@ export function PricingPage() {
             <details>
               <summary>What counts as a page?</summary>
               <p>
-                A page is any item you choose to create—a chapter, character,
-                location, event, or note. Pages have no word limit, so one page
+                A page is any item you choose to create—a chapter, script,
+                character, location, event, or note. Pages have no word limit, so one page
                 can hold anything from a brief character detail to an entire
                 manuscript. The Free limit measures how many separate pages
                 you organize, not how much you can write.

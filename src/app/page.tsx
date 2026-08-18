@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = {
   title: "Grove · Keep your whole story connected",
   description:
-    "Write chapters while organizing characters, places, timelines, relationships, research, and ideas in one connected story workspace.",
+    "Write chapters, keep a world bible, and draft in a dedicated script format. Grove connects pages, timelines, relationships, research, and review in one story workspace.",
 };
 
 export default async function Home() {

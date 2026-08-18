@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Grove",
-  description: "A connected writing space for stories and worlds.",
+  description: "A connected writing space for stories, worlds, and scripts.",
 };
 
 export const viewport: Viewport = {

@@ -13,7 +13,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           Grove
         </Link>
         <nav aria-label="Main navigation">
-          <Link href="/#features">Features</Link>
+          <Link href="/features">Features</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/sign-in">Sign in</Link>
           <Link href="/sign-up" className="marketing-nav-cta">
@@ -29,8 +29,9 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           </span>
           Grove
         </Link>
-        <p>A connected writing space for stories and worlds.</p>
+        <p>A connected writing space for stories, worlds, and scripts.</p>
         <nav aria-label="Footer navigation">
+          <Link href="/features">Features</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/sign-in">Sign in</Link>
           <Link href="/demo">Try the demo</Link>

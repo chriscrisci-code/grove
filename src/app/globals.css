@@ -4046,6 +4046,56 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 }
 .marketing-feature-card h3 { margin: 22px 0 8px; color: var(--title); font: 700 18px Georgia, serif; }
 .marketing-feature-card p { margin: 0; color: var(--muted); font: 12px/1.6 Georgia, serif; }
+.marketing-features-more {
+  margin: 22px 0 0;
+  text-align: center;
+  font: 13px Georgia, serif;
+}
+.marketing-features-more a {
+  color: var(--forest);
+  font-weight: 700;
+  text-decoration: none;
+}
+.marketing-features-more a:hover { text-decoration: underline; }
+.features-main {
+  width: min(1080px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: clamp(70px, 9vw, 115px) 0 30px;
+}
+.features-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 48px 0 80px;
+}
+.features-detail-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 48%);
+  padding: 25px;
+}
+.features-detail-card > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--forest-soft);
+  color: var(--forest);
+}
+.features-detail-card h2 {
+  margin: 2px 0 8px;
+  color: var(--title);
+  font: 700 18px Georgia, serif;
+}
+.features-detail-card p {
+  margin: 0;
+  color: var(--muted);
+  font: 13px/1.65 Georgia, serif;
+}
 .marketing-ai-note {
   display: grid;
   grid-template-columns: 50px 1fr;
@@ -4329,6 +4379,7 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 [data-theme="night"] .marketing-product-bar,
 [data-theme="night"] .marketing-product-body aside { filter: brightness(.65) saturate(.75); }
 [data-theme="night"] .marketing-feature-card,
+[data-theme="night"] .features-detail-card,
 [data-theme="night"] .pricing-card,
 [data-theme="night"] .onboarding-card,
 [data-theme="night"] .billing-boundary-card {
@@ -4381,6 +4432,7 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   .marketing-section-heading > p { margin-top: 15px; }
   .marketing-feature-grid { grid-template-columns: 1fr; }
   .marketing-feature-card { min-height: 0; }
+  .features-detail-grid { grid-template-columns: 1fr; }
   .marketing-ai-note { grid-template-columns: 1fr; }
   .marketing-audience { grid-template-columns: 1fr; gap: 25px; }
   .marketing-audience-icons { flex-direction: row; }
@@ -4555,7 +4607,8 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   .marketing-product-body article { padding-inline: 15px; }
   .marketing-preview-links { display: none; }
   .marketing-cta-row > * { width: 100%; }
-  .pricing-main { width: min(100% - 24px, 520px); padding-top: 55px; }
+  .pricing-main,
+  .features-main { width: min(100% - 24px, 520px); padding-top: 55px; }
   .auth-shell { padding: 14px; }
   .auth-card { padding: 30px 22px; }
   .auth-brand { margin-bottom: 34px; }

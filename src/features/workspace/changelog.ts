@@ -2,6 +2,7 @@ export const CHANGELOG = [
   {
     date: "August 17, 2026",
     items: [
+      "The writing toolbar stays at the top as you scroll. The title above it scrolls away.",
       "Right-click a word for synonyms and similar words, and spelling fixes when it is misspelled.",
       "Relationships opens on Timeline. Web is the second tab; drag nodes wherever you like.",
       "Timeline cards wrap, sit on rainbow lanes, and show a colored snap dot.",

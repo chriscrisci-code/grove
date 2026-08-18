@@ -15,6 +15,10 @@ const SECTIONS = [
         keys: ["right-click"],
         text: "A misspelled word with a red underline shows spelling fixes. Every word also shows synonyms and similar words. Click one to replace it.",
       },
+      {
+        keys: ["toolbar"],
+        text: "The formatting icons stay at the top as you scroll. The title and fields above them scroll away.",
+      },
     ],
   },
   {

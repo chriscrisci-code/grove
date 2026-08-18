@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { canUseFeature, paidRequiredResponse } from "@/features/billing/plan";
 import { validateCoverBytes } from "@/features/dashboard/cover-validation";
 
 export const runtime = "nodejs";
@@ -13,6 +14,7 @@ export async function POST(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canUseFeature("covers")) return paidRequiredResponse("covers");
 
   const { data: workspace } = await supabase
     .from("workspaces")

@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { z } from "zod";
+import { canUseFeature, paidRequiredResponse } from "@/features/billing/plan";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -111,6 +112,7 @@ async function fetchHtml(initialUrl: URL) {
 }
 
 export async function POST(request: Request) {
+  if (!canUseFeature("research")) return paidRequiredResponse("research");
   const supabase = await createClient();
   const {
     data: { user },

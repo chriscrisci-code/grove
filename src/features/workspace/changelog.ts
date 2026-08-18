@@ -2,6 +2,7 @@ export const CHANGELOG = [
   {
     date: "August 17, 2026",
     items: [
+      "Paid feature gates are in place. Everything stays on while billing is tested.",
       "Night colors in Settings dim Grove for writing in low light.",
       "The writing toolbar stays at the top as you scroll. The title above it scrolls away.",
       "Right-click a word for synonyms and similar words, and spelling fixes when it is misspelled.",

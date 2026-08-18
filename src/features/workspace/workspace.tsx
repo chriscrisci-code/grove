@@ -47,6 +47,13 @@ import { ManuscriptPreview } from "@/features/workspace/manuscript-preview";
 import { HelpDialog } from "@/features/workspace/help-dialog";
 import { NightToggle } from "@/features/workspace/night-toggle";
 import { CHANGELOG } from "@/features/workspace/changelog";
+import {
+  canCreatePage,
+  canUseFeature,
+  getPlanAccess,
+  planLimitMessage,
+  type FeatureName,
+} from "@/features/billing/plan";
 import { createClient } from "@/lib/supabase/client";
 import {
   applyPageDrop,
@@ -378,8 +385,26 @@ export function Workspace({
     );
   }, [cloudMode, pageTags, relationships, tags]);
 
+  const denyPlan = useCallback((feature: FeatureName) => {
+    setNotice(planLimitMessage(feature));
+    window.setTimeout(() => setNotice(""), 2800);
+  }, []);
+
+  const openAi = useCallback(
+    (selectedText = "") => {
+      if (!canUseFeature("aiAsk")) {
+        denyPlan("aiAsk");
+        return;
+      }
+      setSelection(selectedText);
+      setAiOpen(true);
+      setSidebarOpen(false);
+    },
+    [denyPlan],
+  );
+
   useEffect(() => {
-    function openAi(event: KeyboardEvent) {
+    function onAskShortcut(event: KeyboardEvent) {
       if (
         event.altKey &&
         event.key.toLowerCase() === "a" &&
@@ -387,13 +412,12 @@ export function Workspace({
         !event.metaKey
       ) {
         event.preventDefault();
-        setAiOpen(true);
-        setSidebarOpen(false);
+        openAi();
       }
     }
-    window.addEventListener("keydown", openAi);
-    return () => window.removeEventListener("keydown", openAi);
-  }, []);
+    window.addEventListener("keydown", onAskShortcut);
+    return () => window.removeEventListener("keydown", onAskShortcut);
+  }, [openAi]);
 
   const activePage = pages.find((page) => page.id === activeId) ?? pages[0];
   const tagTarget =
@@ -434,6 +458,10 @@ export function Workspace({
       pageType: PageType = "page",
       fields: Record<string, string> = {},
     ) => {
+      if (!canCreatePage(pages.length, getPlanAccess())) {
+        denyPlan("extraPages");
+        return null;
+      }
       const page: StoryPage = {
         id: makeId(),
         parentId: pageType === "chapter" ? null : parentId,
@@ -452,7 +480,7 @@ export function Workspace({
       if (activate) setActiveId(page.id);
       return page;
     },
-    [],
+    [denyPlan, pages.length],
   );
 
   const movePage = useCallback(
@@ -662,6 +690,7 @@ export function Workspace({
           page.title.toLowerCase() === title.toLowerCase(),
       );
       const page = existing ?? createPage(parentId, title, false);
+      if (!page) return null;
       applyLink(`#page-${page.id}`);
       setTagTargetId(page.id);
       setNotice(existing ? `Linked to ${page.title}` : `Created ${page.title}`);
@@ -991,12 +1020,6 @@ export function Workspace({
     [activeId, cloudMode, pages],
   );
 
-  const openAi = useCallback((selectedText = "") => {
-    setSelection(selectedText);
-    setAiOpen(true);
-    setSidebarOpen(false);
-  }, []);
-
   function setDesktopSidebarWidth(width: number) {
     const next = Math.min(274, Math.max(64, width));
     sidebarWidthRef.current = next;
@@ -1200,7 +1223,13 @@ export function Workspace({
                 className="icon-button chapter-export"
                 aria-label="Export manuscript"
                 title="Print chapters as PDF"
-                onClick={() => setExportOpen(true)}
+                onClick={() => {
+                  if (!canUseFeature("chapterPdf")) {
+                    denyPlan("chapterPdf");
+                    return;
+                  }
+                  setExportOpen(true);
+                }}
               >
                 <Printer size={15} />
               </button>
@@ -1554,6 +1583,10 @@ export function Workspace({
                 type="button"
                 className={`research-button ${researchOpen ? "active" : ""}`}
                 onClick={() => {
+                  if (!canUseFeature("research")) {
+                    denyPlan("research");
+                    return;
+                  }
                   setResearchOpen((current) => !current);
                   setRelationshipsOpen(false);
                   setAiOpen(false);
@@ -1569,6 +1602,10 @@ export function Workspace({
                 type="button"
                 className={`research-button ${relationshipsOpen ? "active" : ""}`}
                 onClick={() => {
+                  if (!canUseFeature("relationships")) {
+                    denyPlan("relationships");
+                    return;
+                  }
                   setRelationshipsOpen((current) => !current);
                   setResearchOpen(false);
                   setAiOpen(false);
@@ -1635,7 +1672,7 @@ export function Workspace({
                 timelineY: serializeTimelineY(y),
                 timelineLane: serializeTimelineLane(lane),
               });
-              return page.id;
+              return page?.id ?? null;
             }}
             onUpdatePage={updatePage}
           />
@@ -1935,7 +1972,7 @@ type PageBranchProps = {
   canDrag: boolean;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
-  onAdd: (parentId: string, title?: string, activate?: boolean) => StoryPage;
+  onAdd: (parentId: string, title?: string, activate?: boolean) => StoryPage | null;
   onDelete: (id: string) => void;
   onDragStart: (
     event: ReactPointerEvent<HTMLButtonElement>,
@@ -2561,6 +2598,16 @@ function SettingsDialog({
               <p>Night colors dim the page for writing in low light.</p>
             </div>
             <NightToggle />
+          </section>
+          <section className="settings-section">
+            <div>
+              <h3>Grove Paid</h3>
+              <p>
+                Free includes 1 story and 50 pages. Paid unlocks more stories,
+                unlimited pages, Ask AI, Research, and chapter PDF. Billing is
+                not live yet, so every feature stays on while we test.
+              </p>
+            </div>
           </section>
           {onSetPassword && (
             <section className="settings-section">

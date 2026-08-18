@@ -77,7 +77,7 @@ type StoryEditorProps = {
   onCreatePage: (
     title: string,
     linkSelection: (href: string) => void,
-  ) => { id: string; title: string };
+  ) => { id: string; title: string } | null;
   onOpenAi: (selection: string) => void;
   tagTarget: { id: string; title: string } | null;
   onTagTargetChange: (pageId: string | null) => void;
@@ -225,6 +225,7 @@ export function StoryEditor({
           .setTextSelection(linkTo)
           .run();
       });
+      if (!linkedPage) return true;
       onTagTargetChange(linkedPage.id);
       return true;
     },

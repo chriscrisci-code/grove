@@ -37,7 +37,7 @@ type RelationshipTimelineProps = {
   pages: TimelineSourcePage[];
   workspaceId?: string;
   onOpenPage: (pageId: string) => void;
-  onCreateEvent: (y: number, lane: number) => string;
+  onCreateEvent: (y: number, lane: number) => string | null;
   onUpdatePage: (
     pageId: string,
     patch: { title?: string; fields?: Record<string, string> },
@@ -301,6 +301,7 @@ export function RelationshipTimeline({
     const y = canvasYFromClient(event.clientY);
     const lane = canvasLaneFromClient(event.clientX);
     const id = onCreateEvent(y, lane);
+    if (!id) return;
     growToFit(y);
     setNamingId(id);
   }

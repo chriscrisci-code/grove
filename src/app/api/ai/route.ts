@@ -3,6 +3,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { z } from "zod";
+import { canUseFeature, paidRequiredResponse } from "@/features/billing/plan";
 import { decryptSecret } from "@/features/ai/server/encryption";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
@@ -17,6 +18,7 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  if (!canUseFeature("aiAsk")) return paidRequiredResponse("aiAsk");
   const parsed = requestSchema.safeParse(await request.json());
   if (!parsed.success) {
     return Response.json({ error: "Invalid AI request." }, { status: 400 });

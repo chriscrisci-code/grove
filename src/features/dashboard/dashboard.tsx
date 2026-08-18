@@ -14,6 +14,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  canCreateProject,
+  canUseFeature,
+  getPlanAccess,
+  planLimitMessage,
+} from "@/features/billing/plan";
 
 export type DashboardProject = {
   id: string;
@@ -40,6 +46,11 @@ export function Dashboard({
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canCreateProject(projects.length, getPlanAccess())) {
+      setError(planLimitMessage("extraProjects"));
+      setCreating(false);
+      return;
+    }
     setCreating(true);
     setError("");
     const data = new FormData(event.currentTarget);
@@ -61,6 +72,10 @@ export function Dashboard({
 
   async function uploadCover(projectId: string, file?: File) {
     if (!file) return;
+    if (!canUseFeature("covers")) {
+      setError(planLimitMessage("covers"));
+      return;
+    }
     setUploadingId(projectId);
     setError("");
     const body = new FormData();
@@ -85,6 +100,14 @@ export function Dashboard({
           : project,
       ),
     );
+  }
+
+  function requestNewProject() {
+    if (!canCreateProject(projects.length, getPlanAccess())) {
+      setError(planLimitMessage("extraProjects"));
+      return;
+    }
+    setDialogOpen(true);
   }
 
   return (
@@ -123,7 +146,7 @@ export function Dashboard({
           <button
             type="button"
             className="dashboard-create"
-            onClick={() => setDialogOpen(true)}
+            onClick={requestNewProject}
           >
             <Plus size={17} />
             New project
@@ -145,7 +168,7 @@ export function Dashboard({
             <button
               type="button"
               className="project-add-card"
-              onClick={() => setDialogOpen(true)}
+              onClick={requestNewProject}
             >
               <Plus size={24} />
               <strong>Start another story</strong>
@@ -162,7 +185,7 @@ export function Dashboard({
             <button
               type="button"
               className="dashboard-create"
-              onClick={() => setDialogOpen(true)}
+              onClick={requestNewProject}
             >
               <Plus size={17} />
               Create project

@@ -13,7 +13,7 @@ type RelationshipsViewProps = {
   workspaceId?: string;
   onOpenPage: (pageId: string) => void;
   onClose: () => void;
-  onCreateEvent: (y: number, lane: number) => string;
+  onCreateEvent: (y: number, lane: number) => string | null;
   onUpdatePage: (
     pageId: string,
     patch: { title?: string; fields?: Record<string, string> },

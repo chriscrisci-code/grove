@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { canUseFeature, paidRequiredResponse } from "@/features/billing/plan";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -16,6 +17,7 @@ type TavilyResult = {
 };
 
 export async function POST(request: Request) {
+  if (!canUseFeature("research")) return paidRequiredResponse("research");
   const supabase = await createClient();
   const {
     data: { user },

@@ -120,6 +120,10 @@ const SECTIONS = [
         keys: ["Settings"],
         text: "Connect an AI key, set a sign-in password, choose night colors for low light, and open the Changelog for everything shipped so far.",
       },
+      {
+        keys: ["Paid"],
+        text: "Free includes 1 story and 50 pages. Grove Paid unlocks more stories, unlimited pages, Ask AI, Research, and chapter PDF.",
+      },
     ],
   },
 ];

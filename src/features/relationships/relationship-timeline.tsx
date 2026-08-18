@@ -25,9 +25,11 @@ import {
   snapTimelineLane,
   splitTimelinePages,
   timelineCanvasHeight,
+  timelineCardLeft,
   timelineCardWidth,
   timelineExtentStorageKey,
   timelineLaneCenter,
+  timelineSnapOffset,
   withTimelineY,
   withoutTimelineY,
   type TimelineSourcePage,
@@ -160,11 +162,7 @@ export function RelationshipTimeline({
   }
 
   function cardLeft(lane: number) {
-    const center = TIMELINE_GUTTER + timelineLaneCenter(lane, usableWidth || 1);
-    return Math.min(
-      Math.max(8, center - cardWidth / 2),
-      Math.max(8, boardWidth - cardWidth - 8),
-    );
+    return timelineCardLeft(lane, usableWidth || 1, boardWidth, cardWidth);
   }
 
   function placePage(pageId: string, y: number, lane?: number) {
@@ -407,7 +405,15 @@ export function RelationshipTimeline({
               >
                 <span
                   className="timeline-card-snap"
-                  style={{ background: TIMELINE_LANE_COLORS[lane] }}
+                  style={{
+                    background: TIMELINE_LANE_COLORS[lane],
+                    left: timelineSnapOffset(
+                      lane,
+                      cardLeft(lane),
+                      cardWidth,
+                      usableWidth || 1,
+                    ),
+                  }}
                   aria-hidden="true"
                 />
                 <i style={{ background: PAGE_TYPE_COLORS[page.pageType] }} />

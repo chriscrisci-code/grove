@@ -3,6 +3,7 @@ import {
   TIMELINE_CARD_GAP,
   TIMELINE_CARD_HEIGHT,
   TIMELINE_DEFAULT_Y,
+  TIMELINE_GUTTER,
   TIMELINE_MIN_EXTENT,
   nextTrayClickY,
   parseStoredExtent,
@@ -12,8 +13,11 @@ import {
   snapTimelineLane,
   splitTimelinePages,
   timelineCanvasHeight,
+  timelineCardLeft,
   timelineCardWidth,
   timelineExtentStorageKey,
+  timelineLaneCenter,
+  timelineSnapOffset,
   withTimelineY,
   withoutTimelineY,
 } from "./timeline";
@@ -74,6 +78,20 @@ describe("timeline helpers", () => {
     expect(serializeTimelineLane(9)).toBe("5");
     expect(timelineCardWidth(600, 720)).toBeGreaterThan(600 / 6);
     expect(timelineCardWidth(600, 720)).toBeLessThanOrEqual(720 * 0.75);
+  });
+
+  it("keeps the snap dot on the lane when a card is clamped to the board", () => {
+    const boardWidth = 720;
+    const usableWidth = boardWidth - TIMELINE_GUTTER;
+    const cardWidth = timelineCardWidth(usableWidth, boardWidth);
+    for (let lane = 0; lane < 6; lane += 1) {
+      const left = timelineCardLeft(lane, usableWidth, boardWidth, cardWidth);
+      const snap = timelineSnapOffset(lane, left, cardWidth, usableWidth);
+      const laneX = TIMELINE_GUTTER + timelineLaneCenter(lane, usableWidth);
+      expect(left + snap).toBeCloseTo(laneX);
+      expect(snap).toBeGreaterThanOrEqual(6);
+      expect(snap).toBeLessThanOrEqual(cardWidth - 6);
+    }
   });
 
   it("places a tray click after the last item", () => {

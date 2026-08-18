@@ -77,6 +77,30 @@ export function timelineCardWidth(usableWidth: number, boardWidth: number): numb
   return Math.min(Math.max(laneWidth * 2.55, 144), boardWidth * 0.75);
 }
 
+export function timelineCardLeft(
+  lane: number,
+  usableWidth: number,
+  boardWidth: number,
+  cardWidth: number,
+) {
+  const center = TIMELINE_GUTTER + timelineLaneCenter(lane, usableWidth);
+  return Math.min(
+    Math.max(8, center - cardWidth / 2),
+    Math.max(8, boardWidth - cardWidth - 8),
+  );
+}
+
+export function timelineSnapOffset(
+  lane: number,
+  cardLeft: number,
+  cardWidth: number,
+  usableWidth: number,
+) {
+  const laneX = TIMELINE_GUTTER + timelineLaneCenter(lane, usableWidth);
+  const inset = 6;
+  return Math.min(cardWidth - inset, Math.max(inset, laneX - cardLeft));
+}
+
 export function withTimelineY(
   fields: Record<string, string>,
   y: number,

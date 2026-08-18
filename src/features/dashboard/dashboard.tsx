@@ -8,6 +8,7 @@ import {
   LogOut,
   Plus,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,6 +29,7 @@ export type DashboardProject = {
   genre: string | null;
   coverUrl: string | null;
   updatedAt: string;
+  canDelete: boolean;
 };
 
 export function Dashboard({
@@ -43,6 +45,10 @@ export function Dashboard({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState("");
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DashboardProject | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,6 +116,28 @@ export function Dashboard({
     setDialogOpen(true);
   }
 
+  async function deleteProject() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setError("");
+    const response = await fetch(`/api/workspaces/${deleteTarget.id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      setError(result.error || "The project could not be deleted.");
+      setDeleting(false);
+      return;
+    }
+    setProjects((current) =>
+      current.filter((project) => project.id !== deleteTarget.id),
+    );
+    setDeleting(false);
+    setDeleteTarget(null);
+  }
+
   return (
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
@@ -163,6 +191,7 @@ export function Dashboard({
                 project={project}
                 uploading={uploadingId === project.id}
                 onUpload={(file) => void uploadCover(project.id, file)}
+                onDelete={() => setDeleteTarget(project)}
               />
             ))}
             <button
@@ -265,6 +294,66 @@ export function Dashboard({
           </section>
         </div>
       )}
+      {deleteTarget && (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting) {
+              setDeleteTarget(null);
+            }
+          }}
+        >
+          <section
+            className="project-dialog project-delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-project-title"
+            aria-describedby="delete-project-description"
+          >
+            <header>
+              <div>
+                <span className="eyebrow">DELETE PROJECT</span>
+                <h2 id="delete-project-title">Delete “{deleteTarget.name}”?</h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Close"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="project-delete-body">
+              <p id="delete-project-description">
+                This permanently deletes every page, tag, relationship, and
+                saved research item in this project. This cannot be undone.
+              </p>
+              <footer>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={deleting}
+                  onClick={() => setDeleteTarget(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="destructive-button"
+                  disabled={deleting}
+                  onClick={() => void deleteProject()}
+                >
+                  {deleting && <LoaderCircle className="spin" size={15} />}
+                  {deleting ? "Deleting…" : "Delete project"}
+                </button>
+              </footer>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -273,10 +362,12 @@ function ProjectCard({
   project,
   uploading,
   onUpload,
+  onDelete,
 }: {
   project: DashboardProject;
   uploading: boolean;
   onUpload: (file?: File) => void;
+  onDelete: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -309,6 +400,17 @@ function ProjectCard({
           )}
           {uploading ? "Uploading…" : project.coverUrl ? "Replace" : "Add cover"}
         </button>
+        {project.canDelete && (
+          <button
+            type="button"
+            className="project-delete-button"
+            aria-label={`Delete ${project.name}`}
+            title="Delete project"
+            onClick={onDelete}
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
         <input
           ref={inputRef}
           type="file"

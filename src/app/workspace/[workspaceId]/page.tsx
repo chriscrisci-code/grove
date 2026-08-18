@@ -9,6 +9,7 @@ import {
   normalizePageType,
   type StoryRelationship,
 } from "@/features/workspace/page-types";
+import { normalizeTagColor } from "@/features/workspace/tags";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function WorkspacePage({
@@ -62,7 +63,7 @@ export default async function WorkspacePage({
     await Promise.all([
       supabase
         .from("tags")
-        .select("id,name")
+        .select("id,name,color")
         .eq("workspace_id", workspace.id)
         .order("name"),
       pages.length
@@ -82,6 +83,7 @@ export default async function WorkspacePage({
   const tags: StoryTag[] = (tagRows ?? []).map((tag) => ({
     id: tag.id,
     name: tag.name,
+    color: normalizeTagColor(tag.color),
   }));
   const pageTags = (pageTagRows ?? []).reduce<Record<string, string[]>>(
     (assignments, assignment) => {

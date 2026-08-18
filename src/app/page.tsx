@@ -22,7 +22,7 @@ export default async function Home() {
 
   const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("id,name,description,genre,cover_path,updated_at")
+    .select("id,name,description,genre,cover_path,updated_at,owner_id")
     .order("updated_at", { ascending: false });
 
   const projects: DashboardProject[] = await Promise.all(
@@ -41,6 +41,7 @@ export default async function Home() {
         genre: workspace.genre,
         coverUrl,
         updatedAt: workspace.updated_at,
+        canDelete: workspace.owner_id === user.id,
       };
     }),
   );

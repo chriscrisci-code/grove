@@ -47,7 +47,7 @@ const SECTIONS = [
       },
       {
         keys: ["Alt+T", "/t"],
-        text: "Tag the last linked page. Click the title first to tag or relate this page instead.",
+        text: "Tag the last linked page. Click the title first to tag this page instead. Existing tags narrow as you type and keep their color; new tags offer sixteen colors.",
       },
       {
         keys: ["Alt+R", "/r"],
@@ -119,6 +119,10 @@ const SECTIONS = [
       {
         keys: ["Settings"],
         text: "Connect an AI key, set a sign-in password, choose night colors for low light, and open the Changelog for everything shipped so far.",
+      },
+      {
+        keys: ["Dashboard"],
+        text: "Project owners can delete a project from its cover. Grove asks for confirmation because every page, tag, relationship, and research item is permanently removed.",
       },
       {
         keys: ["Paid"],

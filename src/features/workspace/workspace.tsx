@@ -79,6 +79,13 @@ import {
   type PageType,
   type StoryRelationship,
 } from "@/features/workspace/page-types";
+import {
+  DEFAULT_TAG_COLOR,
+  TAG_COLOR_PALETTE,
+  filterTags,
+  normalizeTagColor,
+  normalizeTagName,
+} from "@/features/workspace/tags";
 
 export type StoryPage = {
   id: string;
@@ -94,7 +101,12 @@ export type StoryPage = {
 export type StoryTag = {
   id: string;
   name: string;
+  color: string;
 };
+
+function tagColorStyle(color: string) {
+  return { "--tag-color": normalizeTagColor(color) } as CSSProperties;
+}
 
 type AiProvider = "openai" | "anthropic" | "google";
 
@@ -309,7 +321,15 @@ export function Workspace({
       if (storedModel) setModel(storedModel);
       if (storedTags) {
         try {
-          setTags(JSON.parse(storedTags) as StoryTag[]);
+          const restored = JSON.parse(storedTags) as Array<
+            Omit<StoryTag, "color"> & { color?: unknown }
+          >;
+          setTags(
+            restored.map((tag) => ({
+              ...tag,
+              color: normalizeTagColor(tag.color),
+            })),
+          );
         } catch {
           localStorage.removeItem("storytree-tags");
         }
@@ -791,8 +811,9 @@ export function Workspace({
   );
 
   const createAndAssignTag = useCallback(
-    async (pageId: string, requestedName: string) => {
-      const name = requestedName.trim().replace(/\s+/g, " ").slice(0, 40);
+    async (pageId: string, requestedName: string, requestedColor: string) => {
+      const name = normalizeTagName(requestedName);
+      const color = normalizeTagColor(requestedColor);
       if (!name) return;
       let tag = tags.find(
         (candidate) => candidate.name.toLowerCase() === name.toLowerCase(),
@@ -805,9 +826,10 @@ export function Workspace({
             .insert({
               workspace_id: workspaceId,
               name,
+              color,
               created_by: userId,
             })
-            .select("id,name")
+            .select("id,name,color")
             .single();
           if (error || !data) {
             setNotice(
@@ -818,9 +840,9 @@ export function Workspace({
             window.setTimeout(() => setNotice(""), 2600);
             return;
           }
-          tag = data;
+          tag = { ...data, color: normalizeTagColor(data.color) };
         } else {
-          tag = { id: makeId(), name };
+          tag = { id: makeId(), name, color };
         }
         setTags((current) =>
           [...current, tag as StoryTag].sort((a, b) =>
@@ -1489,6 +1511,7 @@ export function Workspace({
                         className={`sidebar-tag-row ${
                           tagExpanded ? "active" : ""
                         }`}
+                        style={tagColorStyle(tag.color)}
                         aria-expanded={tagExpanded}
                         onClick={() =>
                           setExpandedTagId((current) =>
@@ -1501,6 +1524,7 @@ export function Workspace({
                         ) : (
                           <ChevronRight size={12} />
                         )}
+                        <span className="tag-color-dot" aria-hidden="true" />
                         <span>{tag.name}</span>
                         <small>{usageCount}</small>
                       </button>
@@ -1847,6 +1871,7 @@ export function Workspace({
                     <button
                       type="button"
                       key={tag.id}
+                      style={tagColorStyle(tag.color)}
                       onClick={() => {
                         setTagTargetId(activePage.id);
                         setTagPickerTargetId(activePage.id);
@@ -2015,8 +2040,8 @@ export function Workspace({
           tags={tags}
           selectedTagIds={pageTags[tagPickerPage.id] ?? []}
           onToggle={(tagId) => void togglePageTag(tagPickerPage.id, tagId)}
-          onCreate={(name) =>
-            void createAndAssignTag(tagPickerPage.id, name)
+          onCreate={(name, color) =>
+            void createAndAssignTag(tagPickerPage.id, name, color)
           }
           onClose={() => setTagPickerTargetId(null)}
         />
@@ -2210,17 +2235,16 @@ function TagPicker({
   tags: StoryTag[];
   selectedTagIds: string[];
   onToggle: (tagId: string) => void;
-  onCreate: (name: string) => void;
+  onCreate: (name: string, color: string) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const cleanQuery = query.trim().replace(/\s+/g, " ");
+  const [selectedColor, setSelectedColor] = useState(DEFAULT_TAG_COLOR);
+  const cleanQuery = normalizeTagName(query);
   const exactTag = tags.find(
     (tag) => tag.name.toLowerCase() === cleanQuery.toLowerCase(),
   );
-  const filteredTags = tags.filter((tag) =>
-    tag.name.toLowerCase().includes(cleanQuery.toLowerCase()),
-  );
+  const filteredTags = filterTags(tags, cleanQuery);
 
   return (
     <div className="dialog-backdrop tag-dialog-backdrop" role="presentation">
@@ -2253,7 +2277,7 @@ function TagPicker({
                 onToggle(exactTag.id);
               }
             } else {
-              onCreate(cleanQuery);
+              onCreate(cleanQuery, selectedColor);
             }
             setQuery("");
           }}
@@ -2276,6 +2300,7 @@ function TagPicker({
                 type="button"
                 key={tag.id}
                 className={selected ? "selected" : ""}
+                style={tagColorStyle(tag.color)}
                 onClick={() => onToggle(tag.id)}
               >
                 <span className="tag-option-mark">
@@ -2286,19 +2311,40 @@ function TagPicker({
             );
           })}
           {cleanQuery && !exactTag && (
-            <button
-              type="button"
-              className="create-tag-option"
-              onClick={() => {
-                onCreate(cleanQuery);
-                setQuery("");
-              }}
-            >
-              <span className="tag-option-mark">
-                <Plus size={13} />
-              </span>
-              <span>Create “{cleanQuery}”</span>
-            </button>
+            <div className="create-tag-panel">
+              <div>
+                <span>Choose a color</span>
+                <div className="tag-color-palette" role="radiogroup">
+                  {TAG_COLOR_PALETTE.map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selectedColor === color.value}
+                      aria-label={color.name}
+                      title={color.name}
+                      className={selectedColor === color.value ? "active" : ""}
+                      style={{ background: color.value }}
+                      onClick={() => setSelectedColor(color.value)}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="create-tag-option"
+                style={tagColorStyle(selectedColor)}
+                onClick={() => {
+                  onCreate(cleanQuery, selectedColor);
+                  setQuery("");
+                }}
+              >
+                <span className="tag-option-mark">
+                  <Plus size={13} />
+                </span>
+                <span>Create “{cleanQuery}”</span>
+              </button>
+            </div>
           )}
           {!cleanQuery && tags.length === 0 && (
             <p>No tags yet. Type a name to create the first one.</p>

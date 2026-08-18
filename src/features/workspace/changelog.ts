@@ -1,5 +1,12 @@
 export const CHANGELOG = [
   {
+    date: "August 18, 2026",
+    items: [
+      "Tags now keep one of sixteen colors across the picker, page, and sidebar. Existing tags appear as colored suggestions while you type.",
+      "Project owners can permanently delete a project from the dashboard after confirming the warning.",
+    ],
+  },
+  {
     date: "August 17, 2026",
     items: [
       "Your story lists pages A to Z. Drag onto a title to nest, or onto Your story to un-nest, and filter by page type.",

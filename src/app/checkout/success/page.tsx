@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  hasLivePlusSubscription,
+  normalizeBillingState,
+} from "@/features/billing/billing-state";
+import {
   mapStripeSubscriptionStatus,
   stripeObjectId,
   syncStripeSubscription,
@@ -23,11 +27,17 @@ export default async function CheckoutSuccessPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in?next=/checkout/success");
-
   const { session_id: sessionId } = await searchParams;
+  if (!user) {
+    const next = sessionId
+      ? `/checkout/success?session_id=${encodeURIComponent(sessionId)}`
+      : "/checkout/success";
+    redirect(`/sign-in?next=${encodeURIComponent(next)}`);
+  }
+
+  const paymentsReady = isStripeConfigured();
   let plusReady = false;
-  if (sessionId && isStripeConfigured()) {
+  if (sessionId && paymentsReady) {
     try {
       const session = await getStripe().checkout.sessions.retrieve(sessionId, {
         expand: ["subscription"],
@@ -59,6 +69,13 @@ export default async function CheckoutSuccessPage({
     }
   }
 
+  if (!plusReady) {
+    const { data: rawBilling } = await supabase.rpc("get_my_billing_state");
+    plusReady = hasLivePlusSubscription(
+      normalizeBillingState(rawBilling).subscriptionStatus,
+    );
+  }
+
   return (
     <main className="billing-boundary-main">
       <section className="billing-boundary-card">
@@ -66,16 +83,16 @@ export default async function CheckoutSuccessPage({
         <h1>
           {plusReady
             ? "Grove Plus is ready."
-            : isStripeConfigured()
+            : paymentsReady
               ? "We are confirming your payment."
-              : "Payments are not connected yet."}
+              : "This site does not have Stripe keys yet."}
         </h1>
         <p>
           {plusReady
             ? "Unlimited stories, research, review, Ask AI, and manuscript export are on this account."
-            : isStripeConfigured()
+            : paymentsReady
               ? "If you completed payment, Grove Plus will appear on this account in a few seconds. You can also refresh Account & billing."
-              : "No charge was made. Add Stripe keys to Grove before subscribing."}
+              : "The test payment may still have gone through in Stripe. Add the Stripe keys to this deployed site, then open Account & billing."}
         </p>
         <Link href="/dashboard" className="marketing-primary-cta">
           Return to your projects

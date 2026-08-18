@@ -30,12 +30,13 @@ export function stripePriceId(interval: "month" | "year") {
 }
 
 export function appUrl(request: Request) {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-  if (configured) return configured;
   const origin = request.headers.get("origin");
-  if (origin) return origin;
+  if (origin) return origin.replace(/\/$/, "");
   const host = request.headers.get("host");
   const proto = request.headers.get("x-forwarded-proto") ?? "http";
-  if (host) return `${proto}://${host}`;
-  return "http://localhost:3000";
+  if (host) return `${proto}://${host}`.replace(/\/$/, "");
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    "http://localhost:3000"
+  );
 }

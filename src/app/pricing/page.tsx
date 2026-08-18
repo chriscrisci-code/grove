@@ -3,9 +3,10 @@ import { PricingPage } from "@/features/marketing/pricing-page";
 import { isStripeConfigured } from "@/lib/stripe";
 
 export const metadata: Metadata = {
-  title: "Pricing · Grove",
+  title: "Pricing",
   description:
-    "Start one story free, then grow into unlimited stories, research, Ask AI, and chapter PDF export with Grove Plus.",
+    "Grove Free includes one story in open beta. Grove Plus adds unlimited stories, research, review, Ask AI, and manuscript PDF export.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default function Pricing() {

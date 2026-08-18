@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { FeaturesPage } from "@/features/marketing/features-page";
 
 export const metadata: Metadata = {
-  title: "Features · Grove",
+  title: "Features",
   description:
-    "Write chapters, keep a world bible, and draft in a dedicated script format. Grove connects pages, timelines, relationships, research, and review in one story workspace.",
+    "Grove features for long fiction: chapters, script format, linked world pages, timeline, relationships, research, and review. Open beta is free to try.",
+  alternates: { canonical: "/features" },
 };
 
 export default function Features() {

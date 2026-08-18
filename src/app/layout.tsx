@@ -1,5 +1,6 @@
 import { NightThemeRoot } from "@/features/workspace/night-theme-root";
 import { VisualViewportRoot } from "@/features/workspace/visual-viewport-root";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -15,8 +16,41 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Grove",
-  description: "A connected writing space for stories, worlds, and scripts.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} · Keep your whole story connected`,
+    template: `%s · ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  keywords: [
+    "fiction writing software",
+    "world bible",
+    "novel writing app",
+    "screenplay format",
+    "story workspace",
+    "character notes",
+    "timeline",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} · Keep your whole story connected`,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary",
+    title: `${SITE_NAME} · Keep your whole story connected`,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export const viewport: Viewport = {

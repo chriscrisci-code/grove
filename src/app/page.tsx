@@ -4,9 +4,16 @@ import { LandingPage } from "@/features/marketing/landing-page";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Grove · Keep your whole story connected",
+  title: "Keep your whole story connected",
   description:
-    "Write chapters, keep a world bible, and draft in a dedicated script format. Grove connects pages, timelines, relationships, research, and review in one story workspace.",
+    "Coming soon. Grove is in open beta: write chapters, keep a world bible, and draft in script format. Sign up and test it for free.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Grove · Keep your whole story connected",
+    description:
+      "Coming soon. Open beta is free. Write chapters, keep a world bible, and draft in a dedicated script format.",
+    url: "/",
+  },
 };
 
 export default async function Home() {

@@ -22,15 +22,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { GROVE_FEATURES } from "@/features/marketing/grove-features";
+import { GroveJsonLd } from "@/features/marketing/grove-json-ld";
 import { MarketingShell } from "@/features/marketing/marketing-shell";
 
 export function LandingPage() {
   return (
     <MarketingShell>
+      <GroveJsonLd />
       <main>
         <section className="marketing-hero">
           <div className="marketing-hero-copy">
-            <span className="eyebrow">A CONNECTED WRITING SPACE</span>
+            <span className="eyebrow">COMING SOON · OPEN BETA</span>
             <h1>Keep your whole story connected.</h1>
             <p>
               Write chapters, tend the world beside them, and open a Script
@@ -39,14 +41,14 @@ export function LandingPage() {
             </p>
             <div className="marketing-cta-row">
               <Link href="/sign-up" className="marketing-primary-cta">
-                Start writing free
+                Sign up for the beta
                 <ArrowRight size={17} />
               </Link>
               <Link href="/features" className="marketing-secondary-cta">
                 See how Grove works
               </Link>
             </div>
-            <small>No credit card required · One story free</small>
+            <small>Beta test is free · No credit card · One story to start</small>
           </div>
           <ProductPreview />
         </section>
@@ -147,12 +149,12 @@ export function LandingPage() {
         </section>
 
         <section className="marketing-final-cta">
-          <span className="eyebrow">BEGIN WITH ONE PAGE</span>
-          <h2>Your story already has roots. Give it somewhere to grow.</h2>
-          <p>One story and fifty pages are free. No credit card required.</p>
+          <span className="eyebrow">BETA TEST FOR FREE</span>
+          <h2>Coming soon. Sign up and start writing now.</h2>
+          <p>Open beta includes one story and fifty pages. No credit card required.</p>
           <div className="marketing-cta-row">
             <Link href="/sign-up" className="marketing-primary-cta">
-              Start writing free
+              Sign up for the beta
               <ArrowRight size={17} />
             </Link>
             <Link href="/pricing" className="marketing-secondary-cta">

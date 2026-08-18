@@ -4,9 +4,10 @@ import { AuthScreen } from "@/features/auth/auth-screen";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Create your account · Grove",
-  description: "Start one connected story free with Grove.",
-  robots: { index: false, follow: false },
+  title: "Create your account",
+  description:
+    "Sign up for Grove’s free open beta. Write chapters, keep a world bible, and draft in script format. No credit card required.",
+  alternates: { canonical: "/sign-up" },
 };
 
 export default async function SignUpPage({

@@ -60,11 +60,32 @@ const SECTIONS = [
     items: [
       {
         keys: ["Type"],
-        text: "Set a page to Event, Character, Location, Animal, Transport, or Unique object. Every typed page keeps one simple Also known as field. Events stay in Your story and can nest like other pages.",
+        text: "Set a page to Script, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events and Scripts stay in Your story and can nest like other pages.",
       },
       {
         keys: ["Chapters"],
         text: "Chapter pages live only in the Chapters list. Drag order is manuscript order. The printer icon prints chapters to PDF.",
+      },
+    ],
+  },
+  {
+    title: "Script",
+    items: [
+      {
+        keys: ["Import"],
+        text: "On a Script page, Import a chapter copies that chapter here as a first-pass screenplay. The chapter is not overwritten.",
+      },
+      {
+        keys: ["Tab", "Enter"],
+        text: "Enter makes the next script line. Tab from Action starts a Character cue, from Dialogue starts the next speaker, and on a Scene heading cycles INT. / EXT. / INT./EXT.",
+      },
+      {
+        keys: ["/int", "/ext", "/c"],
+        text: "/int and /ext start a scene heading. /c or Alt+C opens character names from Character pages. /cut, /fade, /paren, and /night fill common script lines.",
+      },
+      {
+        keys: ["Alt+S"],
+        text: "Start a scene heading. Character names autocomplete as you type a Character line. Tab accepts a name; Enter accepts it and moves to Dialogue.",
       },
     ],
   },

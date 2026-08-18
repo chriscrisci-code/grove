@@ -40,6 +40,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { StoryEditor } from "@/features/editor/story-editor";
+import { ScriptEditor } from "@/features/editor/script-editor";
+import {
+  htmlToScriptHtml,
+  mergeScriptHtml,
+  proseToScriptHtml,
+} from "@/features/editor/script-format";
 import { RelationshipsView } from "@/features/relationships/relationships-view";
 import {
   canonicalFamilyPair,
@@ -262,6 +268,7 @@ export function Workspace({
   const [researchOpen, setResearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [importChapterOpen, setImportChapterOpen] = useState(false);
   const [selection, setSelection] = useState("");
   const [reviewSelection, setReviewSelection] = useState({
     pageId: "",
@@ -621,6 +628,15 @@ export function Workspace({
     window.addEventListener("keydown", onAskShortcut);
     return () => window.removeEventListener("keydown", onAskShortcut);
   }, [openAi]);
+
+  useEffect(() => {
+    if (!importChapterOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setImportChapterOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [importChapterOpen]);
 
   const activePage = pages.find((page) => page.id === activeId) ?? pages[0];
   const tagTarget =
@@ -1114,6 +1130,10 @@ export function Workspace({
         }
         return {
           ...page,
+          content:
+            pageType === "script"
+              ? htmlToScriptHtml(page.content)
+              : page.content,
           fields: isTimelinePageType(pageType)
             ? page.fields
             : withoutTimelineY(page.fields),
@@ -1122,7 +1142,43 @@ export function Workspace({
       }),
     );
     if (pageType === "chapter") setChaptersOpen(true);
+    if (pageType === "script") setEditorNonce((current) => current + 1);
   }, [blockReadOnly, readOnly]);
+
+  const importChapterIntoScript = useCallback(
+    (chapterId: string) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
+      const chapter = pages.find(
+        (page) => page.id === chapterId && page.pageType === "chapter",
+      );
+      if (!chapter || activePage.pageType !== "script") return;
+      const incoming = proseToScriptHtml(chapter.content);
+      const next = mergeScriptHtml(activePage.content, incoming);
+      updateActivePage({
+        content: next,
+        title:
+          !activePage.title.trim() || activePage.title === "Untitled"
+            ? chapter.title
+            : activePage.title,
+      });
+      setEditorNonce((current) => current + 1);
+      setImportChapterOpen(false);
+      setNotice(`Imported ${chapter.title || "Untitled"} as a first-pass script.`);
+      window.setTimeout(() => setNotice(""), 2200);
+    },
+    [
+      activePage.content,
+      activePage.pageType,
+      activePage.title,
+      blockReadOnly,
+      pages,
+      readOnly,
+      updateActivePage,
+    ],
+  );
 
   const openRelatePicker = useCallback(
     (pageId: string | null) => {
@@ -2215,29 +2271,40 @@ export function Workspace({
             onUpdatePage={updatePage}
           />
         ) : (
-          <article className="document">
+          <article className={`document ${activePage.pageType === "script" ? "script-document" : ""}`}>
             <div className="document-meta">
               <span>{PAGE_TYPE_LABELS[activePage.pageType].toUpperCase()}</span>
               <span>•</span>
               <span>Edited just now</span>
             </div>
-            <label className="page-type-picker">
-              <span>Type</span>
-              <select
-                value={activePage.pageType}
-                aria-label="Page type"
-                disabled={readOnly}
-                onChange={(event) =>
-                  changePageType(activePage.id, event.target.value as PageType)
-                }
-              >
-                {PAGE_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {PAGE_TYPE_LABELS[type]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="page-type-picker">
+              <label>
+                <span>Type</span>
+                <select
+                  value={activePage.pageType}
+                  aria-label="Page type"
+                  disabled={readOnly}
+                  onChange={(event) =>
+                    changePageType(activePage.id, event.target.value as PageType)
+                  }
+                >
+                  {PAGE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {PAGE_TYPE_LABELS[type]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {activePage.pageType === "script" && !readOnly && (
+                <button
+                  type="button"
+                  className="script-import-button"
+                  onClick={() => setImportChapterOpen(true)}
+                >
+                  Import a chapter
+                </button>
+              )}
+            </div>
             {PAGE_TYPE_FIELDS[activePage.pageType].length > 0 && (
               <div className="page-type-fields">
                 {PAGE_TYPE_FIELDS[activePage.pageType].map((field) => (
@@ -2341,6 +2408,65 @@ export function Workspace({
                 })}
               </div>
             )}
+            {activePage.pageType === "script" ? (
+              <ScriptEditor
+                key={`${activePage.id}-${editorNonce}`}
+                content={htmlToScriptHtml(activePage.content)}
+                onChange={(content) => updateActivePage({ content })}
+                readOnly={readOnly}
+                onSelectionChange={(text) =>
+                  setReviewSelection({ pageId: activePage.id, text })
+                }
+                onCreatePage={createLinkedPage}
+                onOpenAi={openAi}
+                tagTarget={
+                  tagTarget
+                    ? { id: tagTarget.id, title: tagTarget.title }
+                    : null
+                }
+                onTagTargetChange={setTagTargetId}
+                onOpenTags={openTagPicker}
+                onOpenRelate={openRelatePicker}
+                linkablePages={pages.map((page) => ({
+                  id: page.id,
+                  title: page.title,
+                  aliases: pageTypeHasAka(page.pageType)
+                    ? parseAkaNames(page.fields.aka)
+                    : undefined,
+                }))}
+                characterNames={pages
+                  .filter((page) => page.pageType === "character")
+                  .flatMap((page) => [
+                    page.title,
+                    ...(pageTypeHasAka(page.pageType)
+                      ? parseAkaNames(page.fields.aka)
+                      : []),
+                  ])}
+                currentPageId={activePage.id}
+                onFindLinks={(count) => {
+                  setNotice(
+                    count
+                      ? `Linked ${count} ${count === 1 ? "name" : "names"}`
+                      : "No matching page names on this page.",
+                  );
+                  window.setTimeout(() => setNotice(""), 2200);
+                }}
+                onRequestImport={() => setImportChapterOpen(true)}
+                onNavigatePage={(id) => {
+                  if (!pages.some((page) => page.id === id)) return;
+                  setActiveId(id);
+                  setTagTargetId(null);
+                  setTagPickerTargetId(null);
+                  setPages((current) =>
+                    current.map((page) =>
+                      page.id === id && page.unvisited
+                        ? { ...page, unvisited: false }
+                        : page,
+                    ),
+                  );
+                }}
+              />
+            ) : (
             <StoryEditor
               key={`${activePage.id}-${editorNonce}`}
               content={activePage.content}
@@ -2389,6 +2515,7 @@ export function Workspace({
                 );
               }}
             />
+            )}
           </article>
         )}
       </section>
@@ -2500,6 +2627,55 @@ export function Workspace({
       )}
 
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
+      {importChapterOpen && (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onClick={() => setImportChapterOpen(false)}
+        >
+          <section
+            className="script-import-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="script-import-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <span className="eyebrow">SCRIPT</span>
+                <h2 id="script-import-title">Import a chapter</h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Close chapter import"
+                onClick={() => setImportChapterOpen(false)}
+              >
+                <X size={17} />
+              </button>
+            </header>
+            <p>
+              Grove copies the chapter into this Script page as a first pass.
+              The chapter itself is left alone.
+            </p>
+            {chapterPages.length === 0 ? (
+              <p>No chapters yet. Set a page type to Chapter, then import it here.</p>
+            ) : (
+              <div className="script-import-list">
+                {chapterPages.map((chapter) => (
+                  <button
+                    type="button"
+                    key={chapter.id}
+                    onClick={() => importChapterIntoScript(chapter.id)}
+                  >
+                    {chapter.title || "Untitled"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {tagPickerPage && (
         <TagPicker

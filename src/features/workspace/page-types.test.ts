@@ -18,6 +18,7 @@ const pages = [
 describe("page types and chapter order", () => {
   it("defaults unknown types to page", () => {
     expect(normalizePageType("character")).toBe("character");
+    expect(normalizePageType("script")).toBe("script");
     expect(normalizePageType("nope")).toBe("page");
   });
 
@@ -54,6 +55,12 @@ describe("page types and chapter order", () => {
   it("keeps an event nested in the page tree", () => {
     const next = applyPageTypeChange(pages, "mara", "event");
     expect(next.find((page) => page.id === "mara")?.pageType).toBe("event");
+    expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
+  });
+
+  it("keeps a script nested in the page tree", () => {
+    const next = applyPageTypeChange(pages, "mara", "script");
+    expect(next.find((page) => page.id === "mara")?.pageType).toBe("script");
     expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
   });
 

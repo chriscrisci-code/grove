@@ -877,7 +877,7 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
 .share-dialog-body { padding: 20px 24px 24px; }
 .share-invite-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 190px;
+  grid-template-columns: minmax(140px, 210px) minmax(260px, 1fr);
   gap: 12px;
 }
 .share-invite-form label {

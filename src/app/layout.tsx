@@ -1,5 +1,6 @@
 import { NightThemeRoot } from "@/features/workspace/night-theme-root";
-import type { Metadata } from "next";
+import { VisualViewportRoot } from "@/features/workspace/visual-viewport-root";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +17,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Grove",
   description: "A connected writing space for stories and worlds.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -35,6 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full">
         <NightThemeRoot />
+        <VisualViewportRoot />
         {children}
       </body>
     </html>

@@ -1,3 +1,14 @@
+export const DICTATION_PAUSE_MS = 30_000;
+
+export function shouldKeepDictationAlive(
+  wantListening: boolean,
+  lastSpeechAt: number,
+  now: number,
+  pauseMs = DICTATION_PAUSE_MS,
+) {
+  return wantListening && now - lastSpeechAt < pauseMs;
+}
+
 function wordsOf(text: string) {
   return text
     .trim()

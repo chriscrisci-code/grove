@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { collapseRepeatedLead, speechInsertDelta } from "./dictation";
+import {
+  collapseRepeatedLead,
+  shouldKeepDictationAlive,
+  speechInsertDelta,
+} from "./dictation";
 
 describe("mobile dictation echoes", () => {
   it("keeps one copy when the first two words repeat three times", () => {
@@ -35,5 +39,16 @@ describe("mobile dictation echoes", () => {
 
   it("does not insert an earlier chunk again when the engine repeats it", () => {
     expect(speechInsertDelta("hello world this is", "this is")).toBe("");
+  });
+});
+
+describe("dictation pause", () => {
+  it("restarts while the user still wants the mic and speech was recent", () => {
+    expect(shouldKeepDictationAlive(true, 1_000, 20_000)).toBe(true);
+  });
+
+  it("stops after 30 seconds of silence or when the user taps Stop", () => {
+    expect(shouldKeepDictationAlive(true, 1_000, 32_000)).toBe(false);
+    expect(shouldKeepDictationAlive(false, 1_000, 2_000)).toBe(false);
   });
 });

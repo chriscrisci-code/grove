@@ -2,6 +2,8 @@ export const CHANGELOG = [
   {
     date: "August 17, 2026",
     items: [
+      "Dictate stays on through pauses of up to 30 seconds.",
+      "On a phone, the Grove bar and writing icons stay on screen when the keyboard opens.",
       "Paid feature gates are in place. Everything stays on while billing is tested.",
       "Night colors in Settings dim Grove for writing in low light.",
       "The writing toolbar stays at the top as you scroll. The title above it scrolls away.",

@@ -20,7 +20,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
-import { speechInsertDelta } from "@/features/editor/dictation";
+import {
+  shouldKeepDictationAlive,
+  speechInsertDelta,
+} from "@/features/editor/dictation";
 import {
   lookupWord,
   matchCasing,
@@ -114,6 +117,9 @@ export function StoryEditor({
   const [wordLookupLoading, setWordLookupLoading] = useState(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const committedSpeechRef = useRef("");
+  const listeningIntentRef = useRef(false);
+  const lastSpeechAtRef = useRef(0);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -155,7 +161,14 @@ export function StoryEditor({
         Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
       ),
     );
-    return () => recognitionRef.current?.abort();
+    return () => {
+      listeningIntentRef.current = false;
+      if (restartTimerRef.current != null) {
+        window.clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = null;
+      }
+      recognitionRef.current?.abort();
+    };
   }, []);
   const formatState = useEditorState({
     editor,
@@ -472,8 +485,33 @@ export function StoryEditor({
   if (!editor) return <div className="editor-loading">Opening your page…</div>;
   const dictationEditor = editor;
 
+  function stopDictationRestart() {
+    if (restartTimerRef.current != null) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+  }
+
+  function finishDictation(status?: string) {
+    listeningIntentRef.current = false;
+    stopDictationRestart();
+    recognitionRef.current = null;
+    setListening(false);
+    if (status) {
+      setDictationStatus(status);
+      return;
+    }
+    setDictationStatus((current) =>
+      current.startsWith("Microphone") || current.startsWith("Dictation")
+        ? current
+        : "Dictation stopped.",
+    );
+  }
+
   function toggleDictation() {
-    if (listening) {
+    if (listening || listeningIntentRef.current) {
+      listeningIntentRef.current = false;
+      stopDictationRestart();
       recognitionRef.current?.stop();
       setDictationStatus("Finishing dictation…");
       return;
@@ -487,70 +525,106 @@ export function StoryEditor({
       return;
     }
 
+    function attachRecognition(recognition: BrowserSpeechRecognition) {
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = navigator.language || "en-US";
+      recognition.onresult = (event) => {
+        lastSpeechAtRef.current = Date.now();
+        const finalSegments: string[] = [];
+        let interimText = "";
+        for (
+          let index = event.resultIndex;
+          index < event.results.length;
+          index += 1
+        ) {
+          const result = event.results[index];
+          const transcript = result[0].transcript.trim();
+          if (result.isFinal && transcript) {
+            const delta = speechInsertDelta(
+              committedSpeechRef.current,
+              transcript,
+            );
+            if (delta) {
+              finalSegments.push(delta);
+              committedSpeechRef.current = [
+                committedSpeechRef.current,
+                delta,
+              ]
+                .filter(Boolean)
+                .join(" ");
+            }
+          } else if (transcript) {
+            interimText += `${interimText ? " " : ""}${transcript}`;
+          }
+        }
+        if (finalSegments.length) {
+          dictationEditor
+            .chain()
+            .focus()
+            .insertContent(`${finalSegments.join(" ")} `)
+            .run();
+        }
+        setDictationStatus(
+          interimText.trim()
+            ? `Listening: ${interimText.trim()}`
+            : "Listening… speak naturally.",
+        );
+      };
+      recognition.onerror = (event) => {
+        if (event.error === "no-speech") return;
+        if (event.error === "aborted" && listeningIntentRef.current) return;
+        finishDictation(
+          event.error === "not-allowed"
+            ? "Microphone access was blocked. Allow it in your browser settings."
+            : "Dictation stopped. Tap the microphone to try again.",
+        );
+      };
+      recognition.onend = () => {
+        if (
+          shouldKeepDictationAlive(
+            listeningIntentRef.current,
+            lastSpeechAtRef.current,
+            Date.now(),
+          )
+        ) {
+          stopDictationRestart();
+          restartTimerRef.current = window.setTimeout(() => {
+            restartTimerRef.current = null;
+            if (
+              !shouldKeepDictationAlive(
+                listeningIntentRef.current,
+                lastSpeechAtRef.current,
+                Date.now(),
+              )
+            ) {
+              finishDictation();
+              return;
+            }
+            try {
+              recognition.start();
+            } catch {
+              const next = new Recognition();
+              attachRecognition(next);
+              recognitionRef.current = next;
+              try {
+                next.start();
+              } catch {
+                finishDictation("The microphone could not be started.");
+              }
+            }
+          }, 180);
+          return;
+        }
+        finishDictation();
+      };
+    }
+
     const recognition = new Recognition();
     committedSpeechRef.current = "";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = navigator.language || "en-US";
-    recognition.onresult = (event) => {
-      const finalSegments: string[] = [];
-      let interimText = "";
-      for (
-        let index = event.resultIndex;
-        index < event.results.length;
-        index += 1
-      ) {
-        const result = event.results[index];
-        const transcript = result[0].transcript.trim();
-        if (result.isFinal && transcript) {
-          const delta = speechInsertDelta(
-            committedSpeechRef.current,
-            transcript,
-          );
-          if (delta) {
-            finalSegments.push(delta);
-            committedSpeechRef.current = [
-              committedSpeechRef.current,
-              delta,
-            ]
-              .filter(Boolean)
-              .join(" ");
-          }
-        } else if (transcript) {
-          interimText += `${interimText ? " " : ""}${transcript}`;
-        }
-      }
-      if (finalSegments.length) {
-        dictationEditor
-          .chain()
-          .focus()
-          .insertContent(`${finalSegments.join(" ")} `)
-          .run();
-      }
-      setDictationStatus(
-        interimText.trim()
-          ? `Listening: ${interimText.trim()}`
-          : "Listening… speak naturally.",
-      );
-    };
-    recognition.onerror = (event) => {
-      setListening(false);
-      setDictationStatus(
-        event.error === "not-allowed"
-          ? "Microphone access was blocked. Allow it in your browser settings."
-          : "Dictation stopped. Tap the microphone to try again.",
-      );
-    };
-    recognition.onend = () => {
-      setListening(false);
-      recognitionRef.current = null;
-      setDictationStatus((current) =>
-        current.startsWith("Microphone") || current.startsWith("Dictation")
-          ? current
-          : "Dictation stopped.",
-      );
-    };
-
+    listeningIntentRef.current = true;
+    lastSpeechAtRef.current = Date.now();
+    attachRecognition(recognition);
     recognitionRef.current = recognition;
     try {
       dictationEditor.chain().focus().run();
@@ -558,8 +632,7 @@ export function StoryEditor({
       setListening(true);
       setDictationStatus("Listening… speak naturally.");
     } catch {
-      setListening(false);
-      setDictationStatus("The microphone could not be started.");
+      finishDictation("The microphone could not be started.");
     }
   }
 

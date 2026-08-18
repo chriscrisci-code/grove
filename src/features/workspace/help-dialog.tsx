@@ -114,7 +114,7 @@ const SECTIONS = [
       },
       {
         keys: ["Alt+A"],
-        text: "Ask AI about the current selection. Dictate turns speech into text.",
+        text: "Ask AI about the current selection. Dictate turns speech into text and stays on through pauses of up to 30 seconds.",
       },
       {
         keys: ["Settings"],

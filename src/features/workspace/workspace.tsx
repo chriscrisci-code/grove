@@ -45,6 +45,7 @@ import {
 import { ResearchView } from "@/features/research/research-view";
 import { ManuscriptPreview } from "@/features/workspace/manuscript-preview";
 import { HelpDialog } from "@/features/workspace/help-dialog";
+import { NightToggle } from "@/features/workspace/night-toggle";
 import { CHANGELOG } from "@/features/workspace/changelog";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -2554,6 +2555,13 @@ function SettingsDialog({
             </div>
           ) : (
             <>
+          <section className="settings-section">
+            <div>
+              <h3>Appearance</h3>
+              <p>Night colors dim the page for writing in low light.</p>
+            </div>
+            <NightToggle />
+          </section>
           {onSetPassword && (
             <section className="settings-section">
               <div>

@@ -118,7 +118,7 @@ const SECTIONS = [
       },
       {
         keys: ["Settings"],
-        text: "Connect an AI key, set a sign-in password, and open the Changelog for everything shipped so far.",
+        text: "Connect an AI key, set a sign-in password, choose night colors for low light, and open the Changelog for everything shipped so far.",
       },
     ],
   },

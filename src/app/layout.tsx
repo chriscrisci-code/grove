@@ -1,3 +1,4 @@
+import { NightThemeRoot } from "@/features/workspace/night-theme-root";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -21,9 +22,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-theme="day"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("grove-theme");if(t==="night")document.documentElement.setAttribute("data-theme","night")}catch(e){}})()`,
+          }}
+        />
+      </head>
+      <body className="min-h-full">
+        <NightThemeRoot />
+        {children}
+      </body>
     </html>
   );
 }

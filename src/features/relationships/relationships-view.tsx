@@ -13,6 +13,8 @@ import type {
   StoryRelationship,
 } from "@/features/workspace/page-types";
 
+const GEOGRAPHY_ENABLED = false;
+
 type RelationshipsViewProps = {
   pages: TimelineSourcePage[];
   relationships: StoryRelationship[];
@@ -87,14 +89,16 @@ export function RelationshipsView({
             >
               Family
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "geography"}
-              onClick={() => setView("geography")}
-            >
-              Geography
-            </button>
+            {GEOGRAPHY_ENABLED && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === "geography"}
+                onClick={() => setView("geography")}
+              >
+                Geography
+              </button>
+            )}
           </div>
         </div>
         <button type="button" className="research-close" onClick={onClose}>

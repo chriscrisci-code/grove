@@ -110,7 +110,7 @@ const SECTIONS = [
       },
       {
         keys: ["Relationships"],
-        text: "Timeline orders Chapters and Events. Web shows every named connection. Family builds a typed character tree. Geography draws terrain, borders, regions, and routes, with optional Location links and a map background.",
+        text: "Timeline orders Chapters and Events. Web shows every named connection. Family builds a typed character tree.",
       },
       {
         keys: ["Alt+A"],

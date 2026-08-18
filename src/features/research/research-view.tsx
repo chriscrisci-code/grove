@@ -36,6 +36,7 @@ type ResearchViewProps = {
   pageTitle: string;
   cloudMode: boolean;
   userId?: string;
+  readOnly?: boolean;
   onClose: () => void;
 };
 
@@ -51,6 +52,7 @@ export function ResearchView({
   pageTitle,
   cloudMode,
   userId,
+  readOnly = false,
   onClose,
 }: ResearchViewProps) {
   const [query, setQuery] = useState("");
@@ -132,6 +134,10 @@ export function ResearchView({
   }
 
   async function saveLink(value = query) {
+    if (readOnly) {
+      setMessage("Research is read-only for this story.");
+      return;
+    }
     const url = webpageUrl(value);
     if (!url) {
       setMessage("Paste a webpage URL here before choosing Save link.");
@@ -208,6 +214,10 @@ export function ResearchView({
   }
 
   async function removeLink(id: string) {
+    if (readOnly) {
+      setMessage("Research is read-only for this story.");
+      return;
+    }
     if (cloudMode) {
       const { error } = await createClient()
         .from("research_links")
@@ -269,7 +279,7 @@ export function ResearchView({
         <button
           type="button"
           className="primary-button"
-          disabled={saving}
+          disabled={saving || readOnly}
           onClick={() => void saveLink()}
         >
           {saving ? <LoaderCircle className="spin" size={14} /> : <Globe2 size={14} />}
@@ -324,7 +334,7 @@ export function ResearchView({
                     <button
                       type="button"
                       className="primary-button"
-                      disabled={saving}
+                      disabled={saving || readOnly}
                       onClick={() => void saveLink(activeResult.url)}
                     >
                       <Globe2 size={14} />
@@ -386,15 +396,17 @@ export function ResearchView({
                     {link.description && <p>{link.description}</p>}
                   </div>
                 </a>
-                <button
-                  type="button"
-                  className="research-delete"
-                  onClick={() => void removeLink(link.id)}
-                  aria-label={`Remove ${link.title}`}
-                  title="Remove saved link"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className="research-delete"
+                    onClick={() => void removeLink(link.id)}
+                    aria-label={`Remove ${link.title}`}
+                    title="Remove saved link"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </article>
             ))}
           </div>

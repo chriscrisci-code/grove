@@ -20,6 +20,15 @@ async function ownedWorkspace(workspaceId: string) {
       status: 403,
     } as const;
   }
+  const { data: editable } = await supabase.rpc("workspace_is_editable", {
+    check_workspace_id: workspaceId,
+  });
+  if (editable === false) {
+    return {
+      error: "Make this your Active Free Story before changing its map.",
+      status: 403,
+    } as const;
+  }
   return { supabase, workspace } as const;
 }
 

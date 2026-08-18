@@ -15,7 +15,7 @@ export async function DELETE(
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id,owner_id,cover_path")
+    .select("id,owner_id,cover_path,geography_background_path")
     .eq("id", workspaceId)
     .single();
   if (!workspace || workspace.owner_id !== user.id) {
@@ -25,16 +25,21 @@ export async function DELETE(
     );
   }
 
-  if (workspace.cover_path) {
-    const { error: coverError } = await supabase.storage
-      .from("workspace-covers")
-      .remove([workspace.cover_path]);
-    if (coverError) {
-      return Response.json(
-        { error: "The project cover could not be removed. Try again." },
-        { status: 500 },
-      );
-    }
+  const [coverRemoval, geographyRemoval] = await Promise.all([
+    workspace.cover_path
+      ? supabase.storage.from("workspace-covers").remove([workspace.cover_path])
+      : Promise.resolve({ error: null }),
+    workspace.geography_background_path
+      ? supabase.storage
+          .from("workspace-geography")
+          .remove([workspace.geography_background_path])
+      : Promise.resolve({ error: null }),
+  ]);
+  if (coverRemoval.error || geographyRemoval.error) {
+    return Response.json(
+      { error: "The project images could not be removed. Try again." },
+      { status: 500 },
+    );
   }
 
   const { error: deleteError } = await supabase

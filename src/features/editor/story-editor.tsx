@@ -91,6 +91,8 @@ type StoryEditorProps = {
   linkablePages: { id: string; title: string; aliases?: string[] }[];
   currentPageId: string;
   onFindLinks: (count: number) => void;
+  readOnly?: boolean;
+  onSelectionChange?: (text: string) => void;
 };
 
 export function StoryEditor({
@@ -106,6 +108,8 @@ export function StoryEditor({
   linkablePages,
   currentPageId,
   onFindLinks,
+  readOnly = false,
+  onSelectionChange,
 }: StoryEditorProps) {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -135,15 +139,22 @@ export function StoryEditor({
       }),
     ],
     content,
+    editable: !readOnly,
     editorProps: {
       attributes: {
         class: "story-editor",
         spellcheck: "true",
       },
     },
-    onUpdate: ({ editor: currentEditor }) => onChange(currentEditor.getHTML()),
+    onUpdate: ({ editor: currentEditor }) => {
+      if (!readOnly) onChange(currentEditor.getHTML());
+    },
     onSelectionUpdate: ({ editor: currentEditor, transaction }) => {
       if (transaction.docChanged) return;
+      const { from, to, empty } = currentEditor.state.selection;
+      onSelectionChange?.(
+        empty ? "" : currentEditor.state.doc.textBetween(from, to, " "),
+      );
       const { $from } = currentEditor.state.selection;
       const nearbyMarks = [
         ...$from.marks(),
@@ -156,6 +167,10 @@ export function StoryEditor({
       onTagTargetChange(match?.[1] ?? null);
     },
   });
+
+  useEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
   useEffect(() => {
     queueMicrotask(() =>
@@ -688,7 +703,8 @@ export function StoryEditor({
 
   return (
     <div className="editor-frame">
-      <div className="editor-toolbar" aria-label="Text formatting">
+      {!readOnly && (
+        <div className="editor-toolbar" aria-label="Text formatting">
         {tools.map(({ label, icon: Icon, active, run }) => (
           <button
             type="button"
@@ -787,7 +803,8 @@ export function StoryEditor({
             Target: {tagTarget.title}
           </span>
         )}
-      </div>
+        </div>
+      )}
       {dictationStatus && (
         <div
           className={`dictation-status ${listening ? "listening" : ""}`}

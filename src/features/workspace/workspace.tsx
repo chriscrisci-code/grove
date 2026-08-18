@@ -13,8 +13,10 @@ import {
   GripVertical,
   LibraryBig,
   ListFilter,
+  LockKeyhole,
   LogOut,
   Menu,
+  MessageSquareText,
   PanelLeftClose,
   Plus,
   Printer,
@@ -23,8 +25,10 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -53,6 +57,9 @@ import {
   withoutTimelineY,
 } from "@/features/relationships/timeline";
 import { ResearchView } from "@/features/research/research-view";
+import { ReviewPanel } from "@/features/collaboration/review-panel";
+import { ShareDialog } from "@/features/collaboration/share-dialog";
+import { applyQuotedSuggestion } from "@/features/collaboration/collaboration";
 import { ManuscriptPreview } from "@/features/workspace/manuscript-preview";
 import { HelpDialog } from "@/features/workspace/help-dialog";
 import { NightToggle } from "@/features/workspace/night-toggle";
@@ -181,6 +188,8 @@ type WorkspaceProps = {
   workspaceName?: string;
   userId?: string;
   userEmail?: string;
+  readOnly?: boolean;
+  workspaceRole?: "owner" | "editor" | "viewer";
 };
 
 export function Workspace({
@@ -194,9 +203,25 @@ export function Workspace({
   workspaceName = "My Story",
   userId,
   userEmail,
+  readOnly: serverReadOnly = false,
+  workspaceRole,
 }: WorkspaceProps = {}) {
   const router = useRouter();
   const cloudMode = Boolean(workspaceId && userId);
+  const shouldClaimEditLease =
+    cloudMode &&
+    !serverReadOnly &&
+    (workspaceRole === "owner" || workspaceRole === "editor");
+  const [editLease, setEditLease] = useState<{
+    status: "not-needed" | "checking" | "acquired" | "blocked";
+    holderEmail?: string;
+  }>({
+    status: shouldClaimEditLease ? "checking" : "not-needed",
+  });
+  const readOnly =
+    serverReadOnly ||
+    editLease.status === "checking" ||
+    editLease.status === "blocked";
   const startingPages =
     initialCloudPages?.length ? initialCloudPages : initialPages;
   const [pages, setPages] = useState(startingPages);
@@ -232,10 +257,17 @@ export function Workspace({
   const [expandedTagId, setExpandedTagId] = useState<string | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [selection, setSelection] = useState("");
+  const [reviewSelection, setReviewSelection] = useState({
+    pageId: "",
+    text: "",
+  });
+  const [editorNonce, setEditorNonce] = useState(0);
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [storyTypeFilter, setStoryTypeFilter] = useState<PageType[]>([]);
@@ -247,7 +279,12 @@ export function Workspace({
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<PageDrop | null>(null);
+  const isOwner = workspaceRole === "owner";
+  const canComment = cloudMode && Boolean(workspaceRole);
+  const canResolveComments =
+    workspaceRole === "owner" || workspaceRole === "editor";
   const deletingIds = useRef(new Set<string>());
+  const editLeaseTokenRef = useRef<string | null>(null);
   const sidebarWidthRef = useRef(274);
   const tagPanelHeightRef = useRef(180);
   const pageDragRef = useRef<{
@@ -405,25 +442,95 @@ export function Workspace({
   }, [cloudMode]);
 
   useEffect(() => {
+    if (!shouldClaimEditLease || !workspaceId) return;
+    const leaseToken = crypto.randomUUID();
+    editLeaseTokenRef.current = leaseToken;
+    const supabase = createClient();
+    let active = true;
+    let renewalTimer: number | null = null;
+    let retryTimer: number | null = null;
+
+    async function claimLease() {
+      const { data, error } = await supabase.rpc(
+        "claim_workspace_edit_lease",
+        {
+          p_workspace_id: workspaceId,
+          p_lease_token: leaseToken,
+        },
+      );
+      if (!active) return;
+      const result = data as {
+        acquired?: boolean;
+        holderEmail?: string;
+      } | null;
+      if (error || !result?.acquired) {
+        setEditLease({
+          status: "blocked",
+          holderEmail:
+            result?.holderEmail ||
+            (error ? "Editing is temporarily unavailable" : undefined),
+        });
+        retryTimer = window.setTimeout(() => void claimLease(), 10_000);
+        return;
+      }
+
+      setEditLease({ status: "acquired" });
+      renewalTimer = window.setInterval(async () => {
+        const { data: renewed, error: renewError } = await supabase.rpc(
+          "renew_workspace_edit_lease",
+          {
+            p_workspace_id: workspaceId,
+            p_lease_token: leaseToken,
+          },
+        );
+        if (active && (renewError || renewed !== true)) {
+          setEditLease({ status: "blocked" });
+          if (renewalTimer !== null) {
+            window.clearInterval(renewalTimer);
+            renewalTimer = null;
+          }
+          retryTimer = window.setTimeout(() => void claimLease(), 10_000);
+        }
+      }, 30_000);
+    }
+
+    void claimLease();
+    return () => {
+      active = false;
+      if (editLeaseTokenRef.current === leaseToken) {
+        editLeaseTokenRef.current = null;
+      }
+      if (renewalTimer !== null) window.clearInterval(renewalTimer);
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      void supabase.rpc("release_workspace_edit_lease", {
+        p_workspace_id: workspaceId,
+        p_lease_token: leaseToken,
+      });
+    };
+  }, [shouldClaimEditLease, workspaceId]);
+
+  useEffect(() => {
+    if (readOnly) return;
     const timer = window.setTimeout(async () => {
       if (cloudMode && workspaceId && userId) {
         const supabase = createClient();
-        const { error } = await supabase.from("pages").upsert(
-          pages
+        const leaseToken = editLeaseTokenRef.current;
+        if (!leaseToken) return;
+        const { error } = await supabase.rpc("save_workspace_pages", {
+          p_workspace_id: workspaceId,
+          p_lease_token: leaseToken,
+          p_pages: pages
             .filter((page) => !deletingIds.current.has(page.id))
             .map((page, position) => ({
               id: page.id,
-              workspace_id: workspaceId,
               parent_id: page.parentId,
               title: page.title || "Untitled",
               content: { html: page.content, unvisited: page.unvisited },
               page_type: page.pageType,
               fields: page.fields,
               position,
-              created_by: userId,
             })),
-          { onConflict: "id" },
-        );
+        });
         if (error) {
           setNotice("Cloud save failed. Your text is still on screen.");
           return;
@@ -435,7 +542,7 @@ export function Workspace({
       setSavedAt(Date.now());
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [pages, activeId, cloudMode, userId, workspaceId]);
+  }, [pages, activeId, cloudMode, readOnly, userId, workspaceId]);
 
   useEffect(() => {
     if (cloudMode) return;
@@ -448,6 +555,7 @@ export function Workspace({
   }, [cloudMode, pageTags, relationships, tags]);
 
   useEffect(() => {
+    if (readOnly) return;
     const timer = window.setTimeout(async () => {
       if (cloudMode && workspaceId) {
         const { error } = await createClient()
@@ -464,12 +572,25 @@ export function Workspace({
       }
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [cloudMode, geography, workspaceId]);
+  }, [cloudMode, geography, readOnly, workspaceId]);
 
   const denyPlan = useCallback((feature: FeatureName) => {
     setNotice(planLimitMessage(feature));
     window.setTimeout(() => setNotice(""), 2800);
   }, []);
+
+  const blockReadOnly = useCallback(() => {
+    setNotice(
+      editLease.status === "blocked"
+        ? `${editLease.holderEmail || "Another collaborator"} is editing this story right now.`
+        : workspaceRole === "viewer"
+        ? "Reviewers can comment and suggest, but cannot change the story."
+        : workspaceRole === "editor"
+          ? "This story is read-only under its owner’s current plan."
+          : "This story is read-only. Make it your Active Free Story to edit it.",
+    );
+    window.setTimeout(() => setNotice(""), 2800);
+  }, [editLease, workspaceRole]);
 
   const openAi = useCallback(
     (selectedText = "") => {
@@ -479,6 +600,7 @@ export function Workspace({
       }
       setSelection(selectedText);
       setAiOpen(true);
+      setReviewOpen(false);
       setSidebarOpen(false);
     },
     [denyPlan],
@@ -556,6 +678,10 @@ export function Workspace({
       pageType: PageType = "page",
       fields: Record<string, string> = {},
     ) => {
+      if (readOnly) {
+        blockReadOnly();
+        return null;
+      }
       if (!canCreatePage(pages.length, getPlanAccess())) {
         denyPlan("extraPages");
         return null;
@@ -578,11 +704,15 @@ export function Workspace({
       if (activate) setActiveId(page.id);
       return page;
     },
-    [denyPlan, pages.length],
+    [blockReadOnly, denyPlan, pages.length, readOnly],
   );
 
   const movePage = useCallback(
     (draggedId: string, drop: PageDrop) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       setPages((current) => {
         const next = applyPageDrop(current, draggedId, drop);
         if (!next) return current;
@@ -609,12 +739,12 @@ export function Workspace({
       }
       window.setTimeout(() => setNotice(""), 1800);
     },
-    [pages],
+    [blockReadOnly, pages, readOnly],
   );
 
   const startPageDrag = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>, pageId: string) => {
-      if (search.trim() || sidebarWidth < 112) return;
+      if (readOnly || search.trim() || sidebarWidth < 112) return;
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -627,7 +757,7 @@ export function Workspace({
         drop: null,
       };
     },
-    [search, sidebarWidth],
+    [readOnly, search, sidebarWidth],
   );
 
   const updatePageDrag = useCallback(
@@ -696,6 +826,10 @@ export function Workspace({
 
   const moveChapter = useCallback(
     (draggedId: string, drop: { type: "before" | "after"; targetId: string }) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       setPages((current) => {
         const remainingChapters = current.filter(
           (page) => page.pageType === "chapter" && page.id !== draggedId,
@@ -717,12 +851,12 @@ export function Workspace({
         );
       });
     },
-    [],
+    [blockReadOnly, readOnly],
   );
 
   const startChapterDrag = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>, pageId: string) => {
-      if (search.trim() || sidebarWidth < 112) return;
+      if (readOnly || search.trim() || sidebarWidth < 112) return;
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -735,7 +869,7 @@ export function Workspace({
         drop: null,
       };
     },
-    [search, sidebarWidth],
+    [readOnly, search, sidebarWidth],
   );
 
   const updateChapterDrag = useCallback(
@@ -817,6 +951,10 @@ export function Workspace({
 
   const openTagPicker = useCallback(
     (pageId: string | null) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       if (!pageId || !pages.some((page) => page.id === pageId)) {
         setNotice(
           "Create a page link or place the cursor beside one before using /t.",
@@ -826,11 +964,15 @@ export function Workspace({
       }
       setTagPickerTargetId(pageId);
     },
-    [pages],
+    [blockReadOnly, pages, readOnly],
   );
 
   const togglePageTag = useCallback(
     async (pageId: string, tagId: string) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       const assigned = pageTags[pageId]?.includes(tagId) ?? false;
       setPageTags((current) => ({
         ...current,
@@ -861,11 +1003,15 @@ export function Workspace({
         window.setTimeout(() => setNotice(""), 2200);
       }
     },
-    [cloudMode, pageTags],
+    [blockReadOnly, cloudMode, pageTags, readOnly],
   );
 
   const createAndAssignTag = useCallback(
     async (pageId: string, requestedName: string, requestedColor: string) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       const name = normalizeTagName(requestedName);
       const color = normalizeTagColor(requestedColor);
       if (!name) return;
@@ -909,7 +1055,16 @@ export function Workspace({
         await togglePageTag(pageId, tag.id);
       }
     },
-    [cloudMode, pageTags, tags, togglePageTag, userId, workspaceId],
+    [
+      blockReadOnly,
+      cloudMode,
+      pageTags,
+      readOnly,
+      tags,
+      togglePageTag,
+      userId,
+      workspaceId,
+    ],
   );
 
   const updatePage = useCallback(
@@ -919,6 +1074,10 @@ export function Workspace({
         Pick<StoryPage, "title" | "content" | "pageType" | "fields">
       >,
     ) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       setPages((current) =>
         current.map((page) =>
           page.id === pageId
@@ -927,7 +1086,7 @@ export function Workspace({
         ),
       );
     },
-    [],
+    [blockReadOnly, readOnly],
   );
 
   const updateActivePage = useCallback(
@@ -942,6 +1101,10 @@ export function Workspace({
   );
 
   const changePageType = useCallback((pageId: string, pageType: PageType) => {
+    if (readOnly) {
+      blockReadOnly();
+      return;
+    }
     setPages((current) =>
       applyPageTypeChange(current, pageId, pageType).map((page) => {
         if (page.id !== pageId) {
@@ -959,10 +1122,14 @@ export function Workspace({
       }),
     );
     if (pageType === "chapter") setChaptersOpen(true);
-  }, []);
+  }, [blockReadOnly, readOnly]);
 
   const openRelatePicker = useCallback(
     (pageId: string | null) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       if (!pageId || !pages.some((page) => page.id === pageId)) {
         setNotice(
           "Create a page link or place the cursor beside one before using /r.",
@@ -976,7 +1143,7 @@ export function Workspace({
       }
       setRelatePicker({ fromId: activeId, toId: pageId });
     },
-    [activeId, pages],
+    [activeId, blockReadOnly, pages, readOnly],
   );
 
   const createRelationship = useCallback(
@@ -986,6 +1153,10 @@ export function Workspace({
       requestedLabel: string,
       kind: FamilyRelationshipKind | null = null,
     ) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       const label = requestedLabel.trim().replace(/\s+/g, " ").slice(0, 40);
       if (!label || fromPageId === toPageId) return;
       const duplicate = relationships.some(
@@ -1043,7 +1214,7 @@ export function Workspace({
       setNotice("Relationship saved");
       window.setTimeout(() => setNotice(""), 1800);
     },
-    [cloudMode, relationships, workspaceId],
+    [blockReadOnly, cloudMode, readOnly, relationships, workspaceId],
   );
 
   const createFamilyRelationship = useCallback(
@@ -1076,6 +1247,10 @@ export function Workspace({
 
   const uploadGeographyBackground = useCallback(
     async (file: File) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       if (file.size > 5 * 1024 * 1024) {
         setNotice("Map images must be 5 MB or smaller.");
         return;
@@ -1121,10 +1296,14 @@ export function Workspace({
         background: current.background ?? { opacity: 0.65, fit: "contain" },
       }));
     },
-    [cloudMode, workspaceId],
+    [blockReadOnly, cloudMode, readOnly, workspaceId],
   );
 
   const removeGeographyBackground = useCallback(async () => {
+    if (readOnly) {
+      blockReadOnly();
+      return;
+    }
     if (cloudMode && workspaceId) {
       const response = await fetch(
         `/api/workspaces/${workspaceId}/geography-background`,
@@ -1140,10 +1319,14 @@ export function Workspace({
     }
     setGeographyBackgroundUrl(null);
     setGeography((current) => ({ ...current, background: undefined }));
-  }, [cloudMode, workspaceId]);
+  }, [blockReadOnly, cloudMode, readOnly, workspaceId]);
 
   const deleteRelationship = useCallback(
     async (id: string) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       setRelationships((current) => current.filter((item) => item.id !== id));
       if (!cloudMode) return;
       const { error } = await createClient()
@@ -1155,11 +1338,15 @@ export function Workspace({
         window.setTimeout(() => setNotice(""), 2200);
       }
     },
-    [cloudMode],
+    [blockReadOnly, cloudMode, readOnly],
   );
 
   const deletePage = useCallback(
     async (id: string) => {
+      if (readOnly) {
+        blockReadOnly();
+        return;
+      }
       const target = pages.find((page) => page.id === id);
       if (!target) return;
       const confirmed = window.confirm(
@@ -1237,7 +1424,7 @@ export function Workspace({
       setNotice(`Deleted ${target.title || "Untitled"}`);
       window.setTimeout(() => setNotice(""), 2200);
     },
-    [activeId, cloudMode, pages],
+    [activeId, blockReadOnly, cloudMode, pages, readOnly],
   );
 
   function setDesktopSidebarWidth(width: number) {
@@ -1303,7 +1490,7 @@ export function Workspace({
   const sidebarIndent = 3 + ((sidebarWidth - 64) / (274 - 64)) * 14;
 
   return (
-    <main className="workspace-shell">
+    <main className={`workspace-shell${readOnly ? " read-only" : ""}`}>
       {sidebarOpen && (
         <aside
           className={`sidebar sidebar-${sidebarMode}`}
@@ -1361,14 +1548,16 @@ export function Workspace({
               >
                 <ListFilter size={15} />
               </button>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="Create root page"
-                onClick={() => createPage()}
-              >
-                <Plus size={15} />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Create root page"
+                  onClick={() => createPage()}
+                >
+                  <Plus size={15} />
+                </button>
+              )}
             </div>
           </div>
           {storyFilterOpen && (
@@ -1435,7 +1624,7 @@ export function Workspace({
               expanded={expanded}
               draggingId={draggingId}
               dropTarget={dropTarget}
-              canDrag={!search.trim() && sidebarMode !== "rail"}
+              canDrag={!readOnly && !search.trim() && sidebarMode !== "rail"}
               onSelect={(id) => {
                 setActiveId(id);
                 setTagTargetId(null);
@@ -1485,15 +1674,17 @@ export function Workspace({
                 <span>Chapters</span>
                 <small>{chapterPages.length}</small>
               </button>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="Create chapter"
-                title="Create chapter"
-                onClick={() => createPage(null, "Untitled", true, "chapter")}
-              >
-                <Plus size={15} />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Create chapter"
+                  title="Create chapter"
+                  onClick={() => createPage(null, "Untitled", true, "chapter")}
+                >
+                  <Plus size={15} />
+                </button>
+              )}
               <button
                 type="button"
                 className="icon-button chapter-export"
@@ -1746,6 +1937,7 @@ export function Workspace({
                 aria-label="Sign out"
                 onClick={async () => {
                   await createClient().auth.signOut();
+                  router.replace("/");
                   router.refresh();
                 }}
               >
@@ -1797,7 +1989,7 @@ export function Workspace({
         </aside>
       )}
 
-      {isNarrow && (sidebarOpen || aiOpen) && (
+      {isNarrow && (sidebarOpen || aiOpen || reviewOpen) && (
         <button
           type="button"
           className="workspace-backdrop"
@@ -1805,6 +1997,7 @@ export function Workspace({
           onClick={() => {
             setSidebarOpen(false);
             setAiOpen(false);
+            setReviewOpen(false);
           }}
         />
       )}
@@ -1819,6 +2012,7 @@ export function Workspace({
                 onClick={() => {
                   setSidebarOpen(true);
                   setAiOpen(false);
+                  setReviewOpen(false);
                 }}
                 aria-label="Open sidebar"
               >
@@ -1828,7 +2022,7 @@ export function Workspace({
             <button
               type="button"
               className="dashboard-return"
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/dashboard")}
             >
               <ArrowLeft size={14} />
               <span>Projects</span>
@@ -1847,6 +2041,12 @@ export function Workspace({
               <>
                 <ChevronRight size={14} />
                 <strong>Relationships</strong>
+              </>
+            )}
+            {reviewOpen && (
+              <>
+                <ChevronRight size={14} />
+                <strong>Review</strong>
               </>
             )}
           </div>
@@ -1868,6 +2068,7 @@ export function Workspace({
                   setResearchOpen((current) => !current);
                   setRelationshipsOpen(false);
                   setAiOpen(false);
+                  setReviewOpen(false);
                   setSidebarOpen(false);
                 }}
               >
@@ -1887,6 +2088,7 @@ export function Workspace({
                   setRelationshipsOpen((current) => !current);
                   setResearchOpen(false);
                   setAiOpen(false);
+                  setReviewOpen(false);
                   setSidebarOpen(false);
                 }}
               >
@@ -1905,6 +2107,31 @@ export function Workspace({
                 <kbd>Alt A</kbd>
               </button>
             )}
+            {canComment && !researchOpen && !relationshipsOpen && (
+              <button
+                type="button"
+                className={`research-button ${reviewOpen ? "active" : ""}`}
+                onClick={() => {
+                  setReviewOpen((current) => !current);
+                  setAiOpen(false);
+                  setSidebarOpen(false);
+                }}
+              >
+                <MessageSquareText size={15} />
+                <span>Review</span>
+              </button>
+            )}
+            {isOwner && workspaceId && (
+              <button
+                type="button"
+                className="help-button"
+                title="Share story"
+                aria-label="Share story"
+                onClick={() => setShareOpen(true)}
+              >
+                <Users size={17} />
+              </button>
+            )}
             <button
               type="button"
               className="help-button"
@@ -1917,6 +2144,25 @@ export function Workspace({
           </div>
         </header>
 
+        {readOnly && editLease.status !== "checking" && (
+          <div className="read-only-banner" role="status">
+            <LockKeyhole size={14} />
+            <span>
+              {editLease.status === "blocked"
+                ? `${editLease.holderEmail || "Another collaborator"} is editing this story. You can read and review until they leave.`
+                : workspaceRole === "viewer"
+                ? "You are a Reviewer. You can read, select and copy text, and leave comments or suggestions."
+                : workspaceRole === "editor"
+                  ? "This story is currently read-only under its owner’s plan. You can still comment and suggest."
+                  : "This story is read-only. Your writing is safe and available to select and copy."}
+            </span>
+            {workspaceRole === "owner" &&
+              editLease.status !== "blocked" && (
+              <Link href="/dashboard">Choose Active Free Story</Link>
+              )}
+          </div>
+        )}
+
         {researchOpen ? (
           <ResearchView
             key={activePage.id}
@@ -1924,6 +2170,7 @@ export function Workspace({
             pageTitle={activePage.title}
             cloudMode={cloudMode}
             userId={userId}
+            readOnly={readOnly}
             onClose={() => setResearchOpen(false)}
           />
         ) : relationshipsOpen ? (
@@ -1956,7 +2203,13 @@ export function Workspace({
             }}
             onCreateFamilyRelationship={createFamilyRelationship}
             onDeleteRelationship={deleteRelationship}
-            onGeographyChange={setGeography}
+            onGeographyChange={(next) => {
+              if (readOnly) {
+                blockReadOnly();
+                return;
+              }
+              setGeography(next);
+            }}
             onUploadGeographyBackground={uploadGeographyBackground}
             onRemoveGeographyBackground={removeGeographyBackground}
             onUpdatePage={updatePage}
@@ -1973,6 +2226,7 @@ export function Workspace({
               <select
                 value={activePage.pageType}
                 aria-label="Page type"
+                disabled={readOnly}
                 onChange={(event) =>
                   changePageType(activePage.id, event.target.value as PageType)
                 }
@@ -1994,6 +2248,7 @@ export function Workspace({
                     <span>{field.label}</span>
                     <input
                       value={activePage.fields[field.key] ?? ""}
+                      readOnly={readOnly}
                       placeholder={field.placeholder}
                       onChange={(event) =>
                         updateActivePage({
@@ -2016,6 +2271,7 @@ export function Workspace({
                 className="document-title"
                 rows={1}
                 value={activePage.title}
+                readOnly={readOnly}
                 onChange={(event) =>
                   updateActivePage({
                     title: event.target.value.replace(/\s*\n+\s*/g, " "),
@@ -2070,23 +2326,29 @@ export function Workspace({
                           ? `${item.label} → ${other?.title || "Untitled"}`
                           : `${other?.title || "Untitled"} → ${item.label}`}
                       </button>
-                      <button
-                        type="button"
-                        className="related-chip-remove"
-                        aria-label="Remove relationship"
-                        onClick={() => void deleteRelationship(item.id)}
-                      >
-                        <X size={11} />
-                      </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          className="related-chip-remove"
+                          aria-label="Remove relationship"
+                          onClick={() => void deleteRelationship(item.id)}
+                        >
+                          <X size={11} />
+                        </button>
+                      )}
                     </span>
                   );
                 })}
               </div>
             )}
             <StoryEditor
-              key={activePage.id}
+              key={`${activePage.id}-${editorNonce}`}
               content={activePage.content}
               onChange={(content) => updateActivePage({ content })}
+              readOnly={readOnly}
+              onSelectionChange={(text) =>
+                setReviewSelection({ pageId: activePage.id, text })
+              }
               onCreatePage={createLinkedPage}
               onOpenAi={openAi}
               tagTarget={
@@ -2140,6 +2402,47 @@ export function Workspace({
           hasKey={Boolean(apiKey) || hasStoredKey}
           onClose={() => setAiOpen(false)}
           onSettings={() => setSettingsOpen(true)}
+        />
+      )}
+
+      {reviewOpen && workspaceId && (
+        <ReviewPanel
+          key={activePage.id}
+          pageId={activePage.id}
+          pageTitle={activePage.title}
+          userId={userId}
+          selectedText={
+            reviewSelection.pageId === activePage.id
+              ? reviewSelection.text
+              : ""
+          }
+          canResolve={canResolveComments}
+          canModerate={isOwner}
+          canApplySuggestions={!readOnly}
+          onApplySuggestion={(quoted, suggestion) => {
+            if (readOnly) {
+              blockReadOnly();
+              return false;
+            }
+            const next = applyQuotedSuggestion(
+              activePage.content,
+              quoted,
+              suggestion,
+            );
+            if (!next) return false;
+            updatePage(activePage.id, { content: next });
+            setEditorNonce((current) => current + 1);
+            return true;
+          }}
+          onClose={() => setReviewOpen(false)}
+        />
+      )}
+
+      {shareOpen && workspaceId && (
+        <ShareDialog
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          onClose={() => setShareOpen(false)}
         />
       )}
 
@@ -2908,13 +3211,19 @@ function SettingsDialog({
           </section>
           <section className="settings-section">
             <div>
-              <h3>Grove Paid</h3>
+              <h3>Grove Plus</h3>
               <p>
-                Free includes 1 story and 50 pages. Paid unlocks more stories,
+                Free includes 1 story and 50 pages. Plus unlocks more stories,
                 unlimited pages, Ask AI, Research, and chapter PDF. Billing is
                 not live yet, so every feature stays on while we test.
               </p>
             </div>
+            <Link
+              href="/account/billing"
+              className="inline-save-button settings-billing-link"
+            >
+              Account &amp; billing
+            </Link>
           </section>
           {onSetPassword && (
             <section className="settings-section">

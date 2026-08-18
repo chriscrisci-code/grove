@@ -24,7 +24,11 @@ export default async function WorkspacePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/");
+  if (!user) {
+    redirect(
+      `/sign-in?next=${encodeURIComponent(`/workspace/${workspaceId}`)}`,
+    );
+  }
 
   const { data: workspace } = await supabase
     .from("workspaces")
@@ -32,6 +36,14 @@ export default async function WorkspacePage({
     .eq("id", workspaceId)
     .single();
   if (!workspace) notFound();
+  const [{ data: canEdit }, { data: workspaceRole }] = await Promise.all([
+    supabase.rpc("caller_can_edit_workspace", {
+      check_workspace_id: workspace.id,
+    }),
+    supabase.rpc("workspace_role_for", {
+      check_workspace_id: workspace.id,
+    }),
+  ]);
 
   const { data: rows } = await supabase
     .from("pages")
@@ -120,6 +132,14 @@ export default async function WorkspacePage({
       initialRelationships={initialRelationships}
       initialGeography={normalizeGeographyDocument(workspace.geography)}
       initialGeographyBackgroundUrl={geographyBackgroundUrl}
+      readOnly={canEdit === false}
+      workspaceRole={
+        workspaceRole === "owner" ||
+        workspaceRole === "editor" ||
+        workspaceRole === "viewer"
+          ? workspaceRole
+          : undefined
+      }
       workspaceId={workspace.id}
       workspaceName={workspace.name}
       userId={user.id}

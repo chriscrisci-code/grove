@@ -28,6 +28,7 @@ describe("plan access", () => {
     expect(canUseFeature("aiAsk", access)).toBe(false);
     expect(canUseFeature("research", access)).toBe(false);
     expect(canUseFeature("chapterPdf", access)).toBe(false);
+    expect(canUseFeature("collaboration", access)).toBe(false);
     expect(canUseFeature("relationships", access)).toBe(true);
     expect(canUseFeature("nightColors", access)).toBe(true);
     expect(canUseFeature("covers", access)).toBe(true);

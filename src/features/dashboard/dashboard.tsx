@@ -3,12 +3,16 @@
 
 import {
   BookOpen,
+  CreditCard,
   ImagePlus,
+  LockKeyhole,
   LoaderCircle,
   LogOut,
   Plus,
   Sparkles,
+  Repeat2,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -16,11 +20,14 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  canCreateProject,
   canUseFeature,
-  getPlanAccess,
   planLimitMessage,
 } from "@/features/billing/plan";
+import {
+  canSwitchActiveStory,
+  formatActiveStorySwitchDate,
+  type BillingState,
+} from "@/features/billing/billing-state";
 
 export type DashboardProject = {
   id: string;
@@ -30,14 +37,19 @@ export type DashboardProject = {
   coverUrl: string | null;
   updatedAt: string;
   canDelete: boolean;
+  isEditable: boolean;
+  isActiveFree: boolean;
+  memberRole?: "owner" | "editor" | "viewer";
 };
 
 export function Dashboard({
   initialProjects,
   userEmail,
+  initialBilling,
 }: {
   initialProjects: DashboardProject[];
   userEmail?: string;
+  initialBilling: BillingState;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
@@ -49,10 +61,30 @@ export function Dashboard({
     null,
   );
   const [deleting, setDeleting] = useState(false);
+  const [billing, setBilling] = useState(initialBilling);
+  const [switchTarget, setSwitchTarget] = useState<DashboardProject | null>(
+    null,
+  );
+  const [switching, setSwitching] = useState(false);
+  const isPlus = billing.effectivePlan === "plus";
+  const ownedProjects = projects.filter((project) => project.canDelete);
+  const canCreateNew = isPlus || ownedProjects.length === 0;
+  const switchAllowed =
+    isPlus ||
+    canSwitchActiveStory(
+      billing.nextActiveSwitchAt,
+      billing.activeSelectionGraceUntil,
+    );
+  const nextSwitchDate = formatActiveStorySwitchDate(
+    billing.nextActiveSwitchAt,
+  );
+  const graceEndDate = formatActiveStorySwitchDate(
+    billing.activeSelectionGraceUntil,
+  );
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canCreateProject(projects.length, getPlanAccess())) {
+    if (!isPlus && ownedProjects.length >= 1) {
       setError(planLimitMessage("extraProjects"));
       setCreating(false);
       return;
@@ -78,6 +110,10 @@ export function Dashboard({
 
   async function uploadCover(projectId: string, file?: File) {
     if (!file) return;
+    if (!projects.find((project) => project.id === projectId)?.isEditable) {
+      setError("Make this your Active Free Story before changing its cover.");
+      return;
+    }
     if (!canUseFeature("covers")) {
       setError(planLimitMessage("covers"));
       return;
@@ -109,7 +145,7 @@ export function Dashboard({
   }
 
   function requestNewProject() {
-    if (!canCreateProject(projects.length, getPlanAccess())) {
+    if (!isPlus && ownedProjects.length >= 1) {
       setError(planLimitMessage("extraProjects"));
       return;
     }
@@ -136,12 +172,51 @@ export function Dashboard({
     );
     setDeleting(false);
     setDeleteTarget(null);
+    router.refresh();
+  }
+
+  async function makeActiveFreeStory() {
+    if (!switchTarget || switching || !switchAllowed) return;
+    setSwitching(true);
+    setError("");
+    const { data, error: switchError } = await createClient().rpc(
+      "set_active_free_workspace",
+      { workspace_id: switchTarget.id },
+    );
+    setSwitching(false);
+    if (switchError) {
+      setError(switchError.message);
+      setSwitchTarget(null);
+      return;
+    }
+    const result = data as { nextActiveSwitchAt?: string | null } | null;
+    setBilling((current) => ({
+      ...current,
+      activeWorkspaceId: switchTarget.id,
+      activeWorkspaceChangedAt: new Date().toISOString(),
+      nextActiveSwitchAt:
+        result?.nextActiveSwitchAt ??
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    }));
+    setProjects((current) =>
+      current.map((project) =>
+        project.canDelete
+          ? {
+              ...project,
+              isActiveFree: project.id === switchTarget.id,
+              isEditable: project.id === switchTarget.id,
+            }
+          : project,
+      ),
+    );
+    setSwitchTarget(null);
+    router.refresh();
   }
 
   return (
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
-        <Link href="/" className="dashboard-brand">
+        <Link href="/dashboard" className="dashboard-brand">
           <span className="brand-mark">
             <BookOpen size={18} />
           </span>
@@ -149,6 +224,14 @@ export function Dashboard({
         </Link>
         <div className="dashboard-user">
           <span>{userEmail}</span>
+          <Link
+            href="/account/billing"
+            className="icon-button"
+            aria-label="Account and billing"
+            title="Account and billing"
+          >
+            <CreditCard size={17} />
+          </Link>
           <button
             type="button"
             className="icon-button"
@@ -156,6 +239,7 @@ export function Dashboard({
             title="Sign out"
             onClick={async () => {
               await createClient().auth.signOut();
+              router.replace("/");
               router.refresh();
             }}
           >
@@ -174,12 +258,33 @@ export function Dashboard({
           <button
             type="button"
             className="dashboard-create"
-            onClick={requestNewProject}
+            onClick={() =>
+              canCreateNew ? requestNewProject() : router.push("/pricing")
+            }
           >
             <Plus size={17} />
-            New project
+            {canCreateNew ? "New project" : "Grove Plus"}
           </button>
         </div>
+
+        {!isPlus && ownedProjects.length > 1 && (
+          <div className="dashboard-free-policy">
+            <div>
+              <LockKeyhole size={17} />
+              <p>
+                <strong>One Active Free Story</strong>
+                Your other stories remain safe, readable, and available to
+                copy. You can change the editable story once every 30 days.
+              </p>
+            </div>
+            {nextSwitchDate && !switchAllowed && (
+              <small>Next change available {nextSwitchDate}</small>
+            )}
+            {graceEndDate && switchAllowed && (
+              <small>Selection grace period through {graceEndDate}</small>
+            )}
+          </div>
+        )}
 
         {error && <p className="dashboard-error">{error}</p>}
 
@@ -192,17 +297,28 @@ export function Dashboard({
                 uploading={uploadingId === project.id}
                 onUpload={(file) => void uploadCover(project.id, file)}
                 onDelete={() => setDeleteTarget(project)}
+                onMakeActive={() => setSwitchTarget(project)}
+                canSwitch={switchAllowed}
+                nextSwitchDate={nextSwitchDate}
               />
             ))}
-            <button
-              type="button"
-              className="project-add-card"
-              onClick={requestNewProject}
-            >
-              <Plus size={24} />
-              <strong>Start another story</strong>
-              <span>Create a fresh writing project</span>
-            </button>
+            {canCreateNew ? (
+              <button
+                type="button"
+                className="project-add-card"
+                onClick={requestNewProject}
+              >
+                <Plus size={24} />
+                <strong>Start another story</strong>
+                <span>Create a fresh writing project</span>
+              </button>
+            ) : (
+              <Link href="/pricing" className="project-add-card">
+                <Plus size={24} />
+                <strong>More stories with Plus</strong>
+                <span>Compare Grove plans</span>
+              </Link>
+            )}
           </div>
         ) : (
           <div className="dashboard-empty">
@@ -354,6 +470,75 @@ export function Dashboard({
           </section>
         </div>
       )}
+      {switchTarget && (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !switching) {
+              setSwitchTarget(null);
+            }
+          }}
+        >
+          <section
+            className="project-dialog active-story-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="active-story-title"
+          >
+            <header>
+              <div>
+                <span className="eyebrow">ACTIVE FREE STORY</span>
+                <h2 id="active-story-title">
+                  Make “{switchTarget.name}” editable?
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Close"
+                disabled={switching}
+                onClick={() => setSwitchTarget(null)}
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="active-story-dialog-body">
+              {switchAllowed ? (
+                <p>
+                  This story will become editable. Your current Active Free
+                  Story will remain readable and available to copy. You can
+                  change again after 30 days.
+                </p>
+              ) : (
+                <p>
+                  Your Active Free Story can be changed again{" "}
+                  {nextSwitchDate ? `on ${nextSwitchDate}` : "after 30 days"}.
+                </p>
+              )}
+              <footer>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={switching}
+                  onClick={() => setSwitchTarget(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={!switchAllowed || switching}
+                  onClick={() => void makeActiveFreeStory()}
+                >
+                  {switching && <LoaderCircle className="spin" size={15} />}
+                  {switching ? "Changing…" : "Make active"}
+                </button>
+              </footer>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -363,16 +548,38 @@ function ProjectCard({
   uploading,
   onUpload,
   onDelete,
+  onMakeActive,
+  canSwitch,
+  nextSwitchDate,
 }: {
   project: DashboardProject;
   uploading: boolean;
   onUpload: (file?: File) => void;
   onDelete: () => void;
+  onMakeActive: () => void;
+  canSwitch: boolean;
+  nextSwitchDate: string | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <article className="project-card">
+    <article
+      className={`project-card${project.isEditable ? "" : " read-only"}`}
+    >
       <div className="project-cover">
+        {project.isActiveFree && (
+          <span className="project-access-badge active">Active Free Story</span>
+        )}
+        {!project.canDelete ? (
+          <span className="project-access-badge shared">
+            <Users size={10} />
+            Shared · {project.memberRole === "editor" ? "Editor" : "Reviewer"}
+          </span>
+        ) : !project.isEditable ? (
+          <span className="project-access-badge">
+            <LockKeyhole size={10} />
+            Read-only
+          </span>
+        ) : null}
         <Link
           href={`/workspace/${project.id}`}
           className="project-cover-link"
@@ -387,19 +594,25 @@ function ProjectCard({
             </div>
           )}
         </Link>
-        <button
-          type="button"
-          className="cover-upload"
-          disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-        >
-          {uploading ? (
-            <LoaderCircle className="spin" size={15} />
-          ) : (
-            <ImagePlus size={15} />
-          )}
-          {uploading ? "Uploading…" : project.coverUrl ? "Replace" : "Add cover"}
-        </button>
+        {project.isEditable && project.canDelete && (
+          <button
+            type="button"
+            className="cover-upload"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading ? (
+              <LoaderCircle className="spin" size={15} />
+            ) : (
+              <ImagePlus size={15} />
+            )}
+            {uploading
+              ? "Uploading…"
+              : project.coverUrl
+                ? "Replace"
+                : "Add cover"}
+          </button>
+        )}
         {project.canDelete && (
           <button
             type="button"
@@ -434,6 +647,24 @@ function ProjectCard({
           }).format(new Date(project.updatedAt))}
         </small>
       </Link>
+      {!project.isEditable && project.canDelete && (
+        <button
+          type="button"
+          className="make-active-story"
+          disabled={!canSwitch}
+          title={
+            canSwitch
+              ? "Make this your editable Free story"
+              : `Available ${nextSwitchDate ?? "after the cooldown"}`
+          }
+          onClick={onMakeActive}
+        >
+          <Repeat2 size={13} />
+          {canSwitch
+            ? "Make Active Free Story"
+            : `Available ${nextSwitchDate ?? "later"}`}
+        </button>
+      )}
     </article>
   );
 }

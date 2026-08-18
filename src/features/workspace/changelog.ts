@@ -2,6 +2,9 @@ export const CHANGELOG = [
   {
     date: "August 18, 2026",
     items: [
+      "Grove now opens with a public introduction and pricing page, with dedicated sign-in, signup, onboarding, dashboard, and billing routes.",
+      "Stories stay readable and copyable after Plus ends. One Active Free Story remains editable, with a seven-day choice period and 30-day switching.",
+      "Grove Plus owners can invite Reviewers or Editors with private links. Members can comment on pages, quote selections, and suggest replacement text without simultaneous editing conflicts.",
       "Relationships now includes a Family tree for typed character connections.",
       "Typed pages now keep only Page Type and Also known as, removing the extra Role, Wants, Region, Species, Kind, and Owner fields.",
       "Tags now keep one of sixteen colors across the picker, page, and sidebar. Existing tags appear as colored suggestions while you type.",

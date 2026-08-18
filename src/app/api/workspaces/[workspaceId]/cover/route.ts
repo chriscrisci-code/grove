@@ -27,6 +27,15 @@ export async function POST(
       { status: 403 },
     );
   }
+  const { data: editable } = await supabase.rpc("workspace_is_editable", {
+    check_workspace_id: workspaceId,
+  });
+  if (editable === false) {
+    return Response.json(
+      { error: "Make this your Active Free Story before changing its cover." },
+      { status: 403 },
+    );
+  }
 
   const form = await request.formData();
   const file = form.get("cover");

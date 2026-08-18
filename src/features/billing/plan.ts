@@ -18,6 +18,7 @@ export const FEATURE_REQUIRED_PLAN = {
   tags: "free",
   findLinks: "free",
   spellingThesaurus: "free",
+  collaboration: "paid",
 } as const;
 
 export type FeatureName = keyof typeof FEATURE_REQUIRED_PLAN;
@@ -75,27 +76,29 @@ export function canCreatePage(
 export function planLimitMessage(feature: FeatureName) {
   switch (feature) {
     case "extraProjects":
-      return "Free Grove includes 1 story. Grove Paid unlocks more.";
+      return "Free Grove includes 1 story. Grove Plus unlocks more.";
     case "extraPages":
-      return "Free Grove includes 50 pages in a story. Grove Paid unlocks more.";
+      return "Free Grove includes 50 pages in a story. Grove Plus unlocks more.";
     case "aiAsk":
-      return "Ask AI is a Grove Paid feature.";
+      return "Ask AI is a Grove Plus feature.";
     case "research":
-      return "Research is a Grove Paid feature.";
+      return "Research is a Grove Plus feature.";
     case "relationships":
-      return "Relationships is a Grove Paid feature.";
+      return "Relationships is a Grove Plus feature.";
     case "chapterPdf":
-      return "Printing chapters to PDF is a Grove Paid feature.";
+      return "Printing chapters to PDF is a Grove Plus feature.";
     case "covers":
-      return "Project covers are a Grove Paid feature.";
+      return "Project covers are a Grove Plus feature.";
     case "nightColors":
-      return "Night colors are a Grove Paid feature.";
+      return "Night colors are a Grove Plus feature.";
     case "tags":
-      return "Tags are a Grove Paid feature.";
+      return "Tags are a Grove Plus feature.";
     case "findLinks":
-      return "Find Links is a Grove Paid feature.";
+      return "Find Links is a Grove Plus feature.";
     case "spellingThesaurus":
-      return "Spelling and synonyms are a Grove Paid feature.";
+      return "Spelling and synonyms are a Grove Plus feature.";
+    case "collaboration":
+      return "Inviting reviewers or editors is a Grove Plus feature.";
   }
 }
 

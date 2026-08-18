@@ -113,6 +113,14 @@ const SECTIONS = [
         text: "Timeline orders Chapters and Events. Web shows every named connection. Family builds a typed character tree.",
       },
       {
+        keys: ["Review"],
+        text: "Members can leave page comments, quote selected text, and propose replacement wording. Owners and editors resolve completed notes.",
+      },
+      {
+        keys: ["Share"],
+        text: "Grove Plus owners can create a private 14-day invite link for a Reviewer or Editor. Reviewers cannot change story text.",
+      },
+      {
         keys: ["Alt+A"],
         text: "Ask AI about the current selection. Dictate turns speech into text and stays on through pauses of up to 30 seconds.",
       },
@@ -126,7 +134,7 @@ const SECTIONS = [
       },
       {
         keys: ["Paid"],
-        text: "Free includes 1 story and 50 pages. Grove Paid unlocks more stories, unlimited pages, Ask AI, Research, and chapter PDF.",
+        text: "Free includes 1 story and 50 pages. Grove Plus will unlock more stories, unlimited pages, collaboration, Ask AI, Research, and chapter PDF. Payments are not connected during the preview.",
       },
     ],
   },

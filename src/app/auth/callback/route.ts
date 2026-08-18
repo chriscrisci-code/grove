@@ -5,7 +5,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next");
-  const safeNext = next?.startsWith("/") ? next : "/";
+  const safeNext =
+    next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 
   if (code) {
     const supabase = await createClient();
@@ -14,6 +15,9 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.redirect(
-    new URL("/?authError=Sign-in%20link%20could%20not%20be%20verified", url.origin),
+    new URL(
+      "/sign-in?authError=Sign-in%20link%20could%20not%20be%20verified",
+      url.origin,
+    ),
   );
 }

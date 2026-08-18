@@ -1,19 +1,27 @@
 "use client";
 
 import { BookOpen, Eye, EyeOff, LoaderCircle, Lock, Mail } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export function AuthScreen() {
+export function AuthScreen({
+  mode,
+  nextPath = "/dashboard",
+  initialMessage = "",
+}: {
+  mode: "signin" | "signup";
+  nextPath?: string;
+  initialMessage?: string;
+}) {
   const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [message, setMessage] = useState(initialMessage);
+  const [isError, setIsError] = useState(Boolean(initialMessage));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -23,7 +31,13 @@ export function AuthScreen() {
     const supabase = createClient();
     const result =
       mode === "signup"
-        ? await supabase.auth.signUp({ email, password })
+        ? await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+            },
+          })
         : await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (result.error) {
@@ -33,10 +47,11 @@ export function AuthScreen() {
     }
     if (!result.data.session) {
       setMessage(
-        "Your account was created, but Supabase still requires email confirmation. Disable Confirm email in Supabase Auth settings.",
+        "Check your inbox to confirm your email. The link will bring you back to finish setting up your first story.",
       );
       return;
     }
+    router.replace(nextPath);
     router.refresh();
   }
 
@@ -56,31 +71,21 @@ export function AuthScreen() {
             ? "Sign in with your email and password. This device will remember you."
             : "Choose an email and password. You’ll enter your writing space immediately."}
         </p>
-        <div className="auth-tabs" role="tablist" aria-label="Account action">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "signin"}
-            className={mode === "signin" ? "active" : ""}
-            onClick={() => {
-              setMode("signin");
-              setMessage("");
-            }}
+        <div className="auth-route-switch">
+          <span>
+            {mode === "signin"
+              ? "New to Grove?"
+              : "Already have a Grove account?"}
+          </span>
+          <Link
+            href={
+              mode === "signin"
+                ? "/sign-up"
+                : `/sign-in?next=${encodeURIComponent(nextPath)}`
+            }
           >
-            Sign in
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "signup"}
-            className={mode === "signup" ? "active" : ""}
-            onClick={() => {
-              setMode("signup");
-              setMessage("");
-            }}
-          >
-            Create account
-          </button>
+            {mode === "signin" ? "Create an account" : "Sign in"}
+          </Link>
         </div>
         <form onSubmit={submit}>
           <label htmlFor="email">Email address</label>

@@ -119,7 +119,7 @@ export function StoryEditor({
   const committedSpeechRef = useRef("");
   const listeningIntentRef = useRef(false);
   const lastSpeechAtRef = useRef(0);
-  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restartTimerRef = useRef<number | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -524,6 +524,7 @@ export function StoryEditor({
       );
       return;
     }
+    const Engine: SpeechRecognitionConstructor = Recognition;
 
     function attachRecognition(recognition: BrowserSpeechRecognition) {
       recognition.continuous = true;
@@ -604,7 +605,7 @@ export function StoryEditor({
             try {
               recognition.start();
             } catch {
-              const next = new Recognition();
+              const next = new Engine();
               attachRecognition(next);
               recognitionRef.current = next;
               try {
@@ -620,7 +621,7 @@ export function StoryEditor({
       };
     }
 
-    const recognition = new Recognition();
+    const recognition = new Engine();
     committedSpeechRef.current = "";
     listeningIntentRef.current = true;
     lastSpeechAtRef.current = Date.now();

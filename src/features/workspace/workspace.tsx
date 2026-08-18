@@ -38,6 +38,15 @@ import {
 import { StoryEditor } from "@/features/editor/story-editor";
 import { RelationshipsView } from "@/features/relationships/relationships-view";
 import {
+  canonicalFamilyPair,
+  validateFamilyRelationship,
+} from "@/features/relationships/family";
+import {
+  emptyGeographyDocument,
+  normalizeGeographyDocument,
+  type GeographyDocument,
+} from "@/features/relationships/geography";
+import {
   isTimelinePageType,
   serializeTimelineLane,
   serializeTimelineY,
@@ -71,11 +80,13 @@ import {
   PAGE_TYPE_LABELS,
   PAGE_TYPES,
   STORY_PAGE_TYPES,
+  FAMILY_RELATIONSHIP_LABELS,
   RELATIONSHIP_SUGGESTIONS,
   normalizePageFields,
   normalizePageType,
   pageTypeHasAka,
   parseAkaNames,
+  type FamilyRelationshipKind,
   type PageType,
   type StoryRelationship,
 } from "@/features/workspace/page-types";
@@ -140,7 +151,7 @@ const initialPages: StoryPage[] = [
       "<h2>Role</h2><p>Protagonist</p><h2>Wants</h2><p>To discover what happened beyond the northern ridge.</p>",
     unvisited: false,
     pageType: "character",
-    fields: { role: "Protagonist", wants: "To discover what happened beyond the northern ridge." },
+    fields: {},
     updatedAt: Date.now() - 2000,
   },
   {
@@ -164,6 +175,8 @@ type WorkspaceProps = {
   initialTags?: StoryTag[];
   initialPageTags?: Record<string, string[]>;
   initialRelationships?: StoryRelationship[];
+  initialGeography?: GeographyDocument;
+  initialGeographyBackgroundUrl?: string | null;
   workspaceId?: string;
   workspaceName?: string;
   userId?: string;
@@ -175,6 +188,8 @@ export function Workspace({
   initialTags = [],
   initialPageTags = {},
   initialRelationships = [],
+  initialGeography,
+  initialGeographyBackgroundUrl = null,
   workspaceId,
   workspaceName = "My Story",
   userId,
@@ -189,6 +204,12 @@ export function Workspace({
   const [pageTags, setPageTags] =
     useState<Record<string, string[]>>(initialPageTags);
   const [relationships, setRelationships] = useState(initialRelationships);
+  const [geography, setGeography] = useState<GeographyDocument>(() =>
+    normalizeGeographyDocument(initialGeography ?? emptyGeographyDocument()),
+  );
+  const [geographyBackgroundUrl, setGeographyBackgroundUrl] = useState<
+    string | null
+  >(initialGeographyBackgroundUrl);
   const [tagTargetId, setTagTargetId] = useState<string | null>(null);
   const [tagPickerTargetId, setTagPickerTargetId] = useState<string | null>(
     null,
@@ -291,6 +312,10 @@ export function Workspace({
     const storedTags = localStorage.getItem("storytree-tags");
     const storedPageTags = localStorage.getItem("storytree-page-tags");
     const storedRelationships = localStorage.getItem("storytree-relationships");
+    const storedGeography = localStorage.getItem("storytree-geography");
+    const storedGeographyBackground = localStorage.getItem(
+      "storytree-geography-background",
+    );
     queueMicrotask(() => {
       if (raw) {
         try {
@@ -347,6 +372,16 @@ export function Workspace({
         } catch {
           localStorage.removeItem("storytree-relationships");
         }
+      }
+      if (storedGeography) {
+        try {
+          setGeography(normalizeGeographyDocument(JSON.parse(storedGeography)));
+        } catch {
+          localStorage.removeItem("storytree-geography");
+        }
+      }
+      if (storedGeographyBackground) {
+        setGeographyBackgroundUrl(storedGeographyBackground);
       }
     });
   }, [cloudMode]);
@@ -411,6 +446,25 @@ export function Workspace({
       JSON.stringify(relationships),
     );
   }, [cloudMode, pageTags, relationships, tags]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      if (cloudMode && workspaceId) {
+        const { error } = await createClient()
+          .rpc("save_workspace_geography", {
+            project_id: workspaceId,
+            map_document: geography,
+          });
+        if (error) {
+          setNotice("The geography map could not be saved.");
+          window.setTimeout(() => setNotice(""), 2600);
+        }
+      } else {
+        localStorage.setItem("storytree-geography", JSON.stringify(geography));
+      }
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [cloudMode, geography, workspaceId]);
 
   const denyPlan = useCallback((feature: FeatureName) => {
     setNotice(planLimitMessage(feature));
@@ -926,7 +980,12 @@ export function Workspace({
   );
 
   const createRelationship = useCallback(
-    async (fromPageId: string, toPageId: string, requestedLabel: string) => {
+    async (
+      fromPageId: string,
+      toPageId: string,
+      requestedLabel: string,
+      kind: FamilyRelationshipKind | null = null,
+    ) => {
       const label = requestedLabel.trim().replace(/\s+/g, " ").slice(0, 40);
       if (!label || fromPageId === toPageId) return;
       const duplicate = relationships.some(
@@ -945,6 +1004,7 @@ export function Workspace({
         fromPageId,
         toPageId,
         label,
+        kind,
       };
       setRelationships((current) => [...current, relationship]);
       if (cloudMode && workspaceId) {
@@ -956,6 +1016,7 @@ export function Workspace({
             from_page_id: fromPageId,
             to_page_id: toPageId,
             label,
+            kind,
           })
           .select("id")
           .single();
@@ -984,6 +1045,102 @@ export function Workspace({
     },
     [cloudMode, relationships, workspaceId],
   );
+
+  const createFamilyRelationship = useCallback(
+    (
+      fromPageId: string,
+      toPageId: string,
+      kind: FamilyRelationshipKind,
+    ) => {
+      const pair = canonicalFamilyPair(fromPageId, toPageId, kind);
+      const error = validateFamilyRelationship({
+        pages,
+        relationships,
+        ...pair,
+        kind,
+      });
+      if (error) {
+        setNotice(error);
+        window.setTimeout(() => setNotice(""), 2600);
+        return;
+      }
+      void createRelationship(
+        pair.fromPageId,
+        pair.toPageId,
+        FAMILY_RELATIONSHIP_LABELS[kind],
+        kind,
+      );
+    },
+    [createRelationship, pages, relationships],
+  );
+
+  const uploadGeographyBackground = useCallback(
+    async (file: File) => {
+      if (file.size > 5 * 1024 * 1024) {
+        setNotice("Map images must be 5 MB or smaller.");
+        return;
+      }
+      if (!cloudMode || !workspaceId) {
+        if (file.size > 2 * 1024 * 1024) {
+          setNotice("Local map backgrounds must be 2 MB or smaller.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result !== "string") return;
+          localStorage.setItem("storytree-geography-background", reader.result);
+          setGeographyBackgroundUrl(reader.result);
+          setGeography((current) => ({
+            ...current,
+            background: current.background ?? {
+              opacity: 0.65,
+              fit: "contain",
+            },
+          }));
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+      const form = new FormData();
+      form.set("background", file);
+      const response = await fetch(
+        `/api/workspaces/${workspaceId}/geography-background`,
+        { method: "POST", body: form },
+      );
+      const result = (await response.json()) as {
+        backgroundUrl?: string | null;
+        error?: string;
+      };
+      if (!response.ok || !result.backgroundUrl) {
+        setNotice(result.error || "The map background could not be uploaded.");
+        return;
+      }
+      setGeographyBackgroundUrl(result.backgroundUrl);
+      setGeography((current) => ({
+        ...current,
+        background: current.background ?? { opacity: 0.65, fit: "contain" },
+      }));
+    },
+    [cloudMode, workspaceId],
+  );
+
+  const removeGeographyBackground = useCallback(async () => {
+    if (cloudMode && workspaceId) {
+      const response = await fetch(
+        `/api/workspaces/${workspaceId}/geography-background`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string };
+        setNotice(result.error || "The map background could not be removed.");
+        return;
+      }
+    } else {
+      localStorage.removeItem("storytree-geography-background");
+    }
+    setGeographyBackgroundUrl(null);
+    setGeography((current) => ({ ...current, background: undefined }));
+  }, [cloudMode, workspaceId]);
 
   const deleteRelationship = useCallback(
     async (id: string) => {
@@ -1773,6 +1930,8 @@ export function Workspace({
           <RelationshipsView
             pages={pages}
             relationships={relationships}
+            geography={geography}
+            geographyBackgroundUrl={geographyBackgroundUrl}
             workspaceId={workspaceId}
             onOpenPage={(id) => {
               setActiveId(id);
@@ -1795,6 +1954,11 @@ export function Workspace({
               });
               return page?.id ?? null;
             }}
+            onCreateFamilyRelationship={createFamilyRelationship}
+            onDeleteRelationship={deleteRelationship}
+            onGeographyChange={setGeography}
+            onUploadGeographyBackground={uploadGeographyBackground}
+            onRemoveGeographyBackground={removeGeographyBackground}
             onUpdatePage={updatePage}
           />
         ) : (

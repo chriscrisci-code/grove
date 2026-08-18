@@ -2,6 +2,8 @@ export const CHANGELOG = [
   {
     date: "August 18, 2026",
     items: [
+      "Relationships now includes a Family tree for typed character connections and a Geography builder for terrain, borders, regions, routes, Location links, and background maps.",
+      "Typed pages now keep only Page Type and Also known as, removing the extra Role, Wants, Region, Species, Kind, and Owner fields.",
       "Tags now keep one of sixteen colors across the picker, page, and sidebar. Existing tags appear as colored suggestions while you type.",
       "Project owners can permanently delete a project from the dashboard after confirming the warning.",
     ],

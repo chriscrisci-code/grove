@@ -60,7 +60,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["Type"],
-        text: "Set a page to Event, Character, Location, Animal, Transport, or Unique object for extra fields, including Also known as. Events stay in Your story and can nest like other pages.",
+        text: "Set a page to Event, Character, Location, Animal, Transport, or Unique object. Every typed page keeps one simple Also known as field. Events stay in Your story and can nest like other pages.",
       },
       {
         keys: ["Chapters"],
@@ -110,7 +110,7 @@ const SECTIONS = [
       },
       {
         keys: ["Relationships"],
-        text: "Opens on Timeline. Switch to Web and drag nodes wherever you like. Click a card or node to write.",
+        text: "Timeline orders Chapters and Events. Web shows every named connection. Family builds a typed character tree. Geography draws terrain, borders, regions, and routes, with optional Location links and a map background.",
       },
       {
         keys: ["Alt+A"],

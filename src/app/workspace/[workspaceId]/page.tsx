@@ -5,10 +5,12 @@ import {
   type StoryTag,
 } from "@/features/workspace/workspace";
 import {
+  normalizeFamilyRelationshipKind,
   normalizePageFields,
   normalizePageType,
   type StoryRelationship,
 } from "@/features/workspace/page-types";
+import { normalizeGeographyDocument } from "@/features/relationships/geography";
 import { normalizeTagColor } from "@/features/workspace/tags";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,7 +28,7 @@ export default async function WorkspacePage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id,name")
+    .select("id,name,geography,geography_background_path")
     .eq("id", workspaceId)
     .single();
   if (!workspace) notFound();
@@ -77,7 +79,7 @@ export default async function WorkspacePage({
         : Promise.resolve({ data: [] }),
       supabase
         .from("page_relationships")
-        .select("id,from_page_id,to_page_id,label")
+        .select("id,from_page_id,to_page_id,label,kind")
         .eq("workspace_id", workspace.id),
     ]);
   const tags: StoryTag[] = (tagRows ?? []).map((tag) => ({
@@ -100,7 +102,15 @@ export default async function WorkspacePage({
     fromPageId: item.from_page_id,
     toPageId: item.to_page_id,
     label: item.label,
+    kind: normalizeFamilyRelationshipKind(item.kind),
   }));
+  const geographyBackgroundUrl = workspace.geography_background_path
+    ? (
+        await supabase.storage
+          .from("workspace-geography")
+          .createSignedUrl(workspace.geography_background_path, 3600)
+      ).data?.signedUrl ?? null
+    : null;
 
   return (
     <Workspace
@@ -108,6 +118,8 @@ export default async function WorkspacePage({
       initialTags={tags}
       initialPageTags={pageTags}
       initialRelationships={initialRelationships}
+      initialGeography={normalizeGeographyDocument(workspace.geography)}
+      initialGeographyBackgroundUrl={geographyBackgroundUrl}
       workspaceId={workspace.id}
       workspaceName={workspace.name}
       userId={user.id}

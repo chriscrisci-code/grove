@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { applyPageTypeChange, reorderAmong } from "./page-tree";
-import { normalizePageType, parseAkaNames } from "./page-types";
+import {
+  PAGE_TYPE_FIELDS,
+  normalizeFamilyRelationshipKind,
+  normalizePageFields,
+  normalizePageType,
+  parseAkaNames,
+} from "./page-types";
 
 const pages = [
   { id: "notes", parentId: null, pageType: "page" as const },
@@ -56,5 +62,32 @@ describe("page types and chapter order", () => {
       "E-Town",
       "the White City",
     ]);
+  });
+
+  it("keeps only also-known-as on typed pages", () => {
+    expect(PAGE_TYPE_FIELDS.character.map((field) => field.key)).toEqual([
+      "aka",
+    ]);
+    expect(PAGE_TYPE_FIELDS.location.map((field) => field.key)).toEqual([
+      "aka",
+    ]);
+    expect(PAGE_TYPE_FIELDS.unique_object.map((field) => field.key)).toEqual([
+      "aka",
+    ]);
+    expect(
+      normalizePageFields({
+        aka: "The Fox",
+        role: "Hero",
+        region: "North",
+        timelineY: "120",
+      }),
+    ).toEqual({ aka: "The Fox", timelineY: "120" });
+  });
+
+  it("normalizes family relationship kinds", () => {
+    expect(normalizeFamilyRelationshipKind("adoptive_parent_of")).toBe(
+      "adoptive_parent_of",
+    );
+    expect(normalizeFamilyRelationshipKind("sibling")).toBeNull();
   });
 });

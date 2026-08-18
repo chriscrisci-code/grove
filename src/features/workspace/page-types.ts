@@ -42,15 +42,11 @@ export const PAGE_TYPE_FIELDS: Record<PageType, PageFieldDef[]> = {
   page: [],
   chapter: [],
   event: [AKA_FIELD],
-  character: [
-    { key: "role", label: "Role" },
-    { key: "wants", label: "Wants" },
-    AKA_FIELD,
-  ],
-  location: [{ key: "region", label: "Region" }, AKA_FIELD],
-  animal: [{ key: "species", label: "Species" }, AKA_FIELD],
-  transport: [{ key: "kind", label: "Kind" }, AKA_FIELD],
-  unique_object: [{ key: "owner", label: "Owner" }, AKA_FIELD],
+  character: [AKA_FIELD],
+  location: [AKA_FIELD],
+  animal: [AKA_FIELD],
+  transport: [AKA_FIELD],
+  unique_object: [AKA_FIELD],
 };
 
 export const PAGE_TYPE_COLORS: Record<PageType, string> = {
@@ -74,11 +70,21 @@ export function normalizePageType(value: unknown): PageType {
 
 export function normalizePageFields(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const removedFields = new Set([
+    "role",
+    "wants",
+    "region",
+    "species",
+    "kind",
+    "owner",
+  ]);
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, field]) => [
-      key,
-      typeof field === "string" ? field : String(field ?? ""),
-    ]),
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !removedFields.has(key))
+      .map(([key, field]) => [
+        key,
+        typeof field === "string" ? field : String(field ?? ""),
+      ]),
   );
 }
 
@@ -105,7 +111,37 @@ export type StoryRelationship = {
   fromPageId: string;
   toPageId: string;
   label: string;
+  kind?: FamilyRelationshipKind | null;
 };
+
+export const FAMILY_RELATIONSHIP_KINDS = [
+  "parent_of",
+  "adoptive_parent_of",
+  "partner",
+  "former_partner",
+] as const;
+
+export type FamilyRelationshipKind =
+  (typeof FAMILY_RELATIONSHIP_KINDS)[number];
+
+export const FAMILY_RELATIONSHIP_LABELS: Record<
+  FamilyRelationshipKind,
+  string
+> = {
+  parent_of: "parent of",
+  adoptive_parent_of: "adoptive parent of",
+  partner: "partner",
+  former_partner: "former partner",
+};
+
+export function normalizeFamilyRelationshipKind(
+  value: unknown,
+): FamilyRelationshipKind | null {
+  return typeof value === "string" &&
+    FAMILY_RELATIONSHIP_KINDS.includes(value as FamilyRelationshipKind)
+    ? (value as FamilyRelationshipKind)
+    : null;
+}
 
 export const RELATIONSHIP_SUGGESTIONS = [
   "lives in",

@@ -21,8 +21,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
 import {
+  mergeDictationTranscript,
   shouldKeepDictationAlive,
-  speechInsertDelta,
 } from "@/features/editor/dictation";
 import {
   lookupWord,
@@ -117,6 +117,8 @@ export function StoryEditor({
   const [wordLookupLoading, setWordLookupLoading] = useState(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const committedSpeechRef = useRef("");
+  const dictationFromRef = useRef(0);
+  const dictationToRef = useRef(0);
   const listeningIntentRef = useRef(false);
   const lastSpeechAtRef = useRef(0);
   const restartTimerRef = useRef<number | null>(null);
@@ -526,13 +528,32 @@ export function StoryEditor({
     }
     const Engine: SpeechRecognitionConstructor = Recognition;
 
+    function writeDictation(text: string) {
+      const content = text ? `${text} ` : "";
+      dictationEditor
+        .chain()
+        .focus()
+        .command(({ tr, dispatch }) => {
+          const size = tr.doc.content.size;
+          const from = Math.min(Math.max(dictationFromRef.current, 0), size);
+          const to = Math.min(Math.max(dictationToRef.current, from), size);
+          if (dispatch) {
+            tr.insertText(content, from, to);
+            dictationToRef.current = from + content.length;
+          }
+          return true;
+        })
+        .run();
+    }
+
     function attachRecognition(recognition: BrowserSpeechRecognition) {
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = navigator.language || "en-US";
       recognition.onresult = (event) => {
         lastSpeechAtRef.current = Date.now();
-        const finalSegments: string[] = [];
+        let committed = committedSpeechRef.current;
+        let display = committed;
         let interimText = "";
         for (
           let index = event.resultIndex;
@@ -541,31 +562,17 @@ export function StoryEditor({
         ) {
           const result = event.results[index];
           const transcript = result[0].transcript.trim();
-          if (result.isFinal && transcript) {
-            const delta = speechInsertDelta(
-              committedSpeechRef.current,
-              transcript,
-            );
-            if (delta) {
-              finalSegments.push(delta);
-              committedSpeechRef.current = [
-                committedSpeechRef.current,
-                delta,
-              ]
-                .filter(Boolean)
-                .join(" ");
-            }
-          } else if (transcript) {
-            interimText += `${interimText ? " " : ""}${transcript}`;
+          if (!transcript) continue;
+          if (result.isFinal) {
+            committed = mergeDictationTranscript(committed, transcript);
+            display = committed;
+          } else {
+            display = mergeDictationTranscript(committed, transcript);
+            interimText = transcript;
           }
         }
-        if (finalSegments.length) {
-          dictationEditor
-            .chain()
-            .focus()
-            .insertContent(`${finalSegments.join(" ")} `)
-            .run();
-        }
+        committedSpeechRef.current = committed;
+        if (display) writeDictation(display);
         setDictationStatus(
           interimText.trim()
             ? `Listening: ${interimText.trim()}`
@@ -625,6 +632,9 @@ export function StoryEditor({
     committedSpeechRef.current = "";
     listeningIntentRef.current = true;
     lastSpeechAtRef.current = Date.now();
+    const caret = dictationEditor.state.selection.from;
+    dictationFromRef.current = caret;
+    dictationToRef.current = caret;
     attachRecognition(recognition);
     recognitionRef.current = recognition;
     try {

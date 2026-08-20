@@ -25,7 +25,10 @@ import {
   type ChapterEventInfo,
 } from "@/features/editor/chapter-event-node";
 import { eventIdsInChapterHtml } from "@/features/editor/chapter-events";
-import { watchChapterEventDragScroll } from "@/features/editor/chapter-event-scroll";
+import {
+  isChapterEventDragging,
+  watchChapterEventDragScroll,
+} from "@/features/editor/chapter-event-scroll";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
 import {
   mergeDictationTranscript,
@@ -337,7 +340,7 @@ export function StoryEditor({
 
   const findExistingPageLinks = useCallback(
     (removeSlashCommand = false) => {
-      if (!editor) return false;
+      if (!editor || isChapterEventDragging()) return false;
       const { from, to, $from } = editor.state.selection;
       if (removeSlashCommand) {
         if (from !== to) return false;

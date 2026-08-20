@@ -56,6 +56,12 @@ export function writingScrollBounds(scroller: HTMLElement) {
   return { top, bottom: pane.bottom };
 }
 
+export const CHAPTER_EVENT_DRAGGING_CLASS = "dragging-chapter-event";
+
+export function isChapterEventDragging() {
+  return document.body.classList.contains(CHAPTER_EVENT_DRAGGING_CLASS);
+}
+
 export function watchChapterEventDragScroll() {
   const onDragStart = (event: DragEvent) => {
     const origin = event.target;
@@ -68,18 +74,31 @@ export function watchChapterEventDragScroll() {
 
     let y = event.clientY;
     let active = true;
+    let releaseTimer = 0;
+    document.body.classList.add(CHAPTER_EVENT_DRAGGING_CLASS);
 
     const onDragOver = (next: DragEvent) => {
       y = next.clientY;
+    };
+    const swallowClick = (click: Event) => {
+      if (!isChapterEventDragging()) return;
+      click.preventDefault();
+      click.stopPropagation();
     };
     const stop = () => {
       active = false;
       document.removeEventListener("dragover", onDragOver, true);
       window.removeEventListener("dragend", stop);
       window.removeEventListener("drop", stop);
+      window.clearTimeout(releaseTimer);
+      releaseTimer = window.setTimeout(() => {
+        document.removeEventListener("click", swallowClick, true);
+        document.body.classList.remove(CHAPTER_EVENT_DRAGGING_CLASS);
+      }, 400);
     };
 
     document.addEventListener("dragover", onDragOver, true);
+    document.addEventListener("click", swallowClick, true);
     window.addEventListener("dragend", stop);
     window.addEventListener("drop", stop);
 
@@ -94,5 +113,8 @@ export function watchChapterEventDragScroll() {
   };
 
   document.addEventListener("dragstart", onDragStart, true);
-  return () => document.removeEventListener("dragstart", onDragStart, true);
+  return () => {
+    document.body.classList.remove(CHAPTER_EVENT_DRAGGING_CLASS);
+    document.removeEventListener("dragstart", onDragStart, true);
+  };
 }

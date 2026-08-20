@@ -1670,6 +1670,10 @@ body.dragging-pages .page-drag-handle { opacity: 1; }
   color: #8a8f86;
   font: 12px/1.4 Georgia, serif;
 }
+body.dragging-chapter-event .topbar,
+body.dragging-chapter-event .editor-toolbar {
+  pointer-events: none;
+}
 .editor-toolbar {
   position: sticky;
   z-index: 4;

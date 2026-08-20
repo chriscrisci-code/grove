@@ -9,11 +9,13 @@ import {
   ChevronRight,
   CircleHelp,
   Clapperboard,
+  Clock3,
   FileText,
   GitFork,
   GripVertical,
   LibraryBig,
   ListFilter,
+  ListIndentDecrease,
   LockKeyhole,
   LogOut,
   Menu,
@@ -79,6 +81,14 @@ import {
   type FeatureName,
   type PlanAccess,
 } from "@/features/billing/plan";
+import {
+  chapterEventChildren,
+  expandChapterEventMarkers,
+  insertChapterEventMarker,
+  isChapterNestedEvent,
+  removeChapterEventMarker,
+  syncChapterEventMarkers,
+} from "@/features/editor/chapter-events";
 import { createClient } from "@/lib/supabase/client";
 import {
   RESEARCH_IMAGES_BUCKET,
@@ -661,7 +671,10 @@ export function Workspace({
   const storyPages = useMemo(
     () =>
       filterStoryPages(
-        pages.filter((page) => !isSidebarListType(page.pageType)),
+        pages.filter((page) => {
+          if (isSidebarListType(page.pageType)) return false;
+          return !isChapterNestedEvent(pages, page);
+        }),
         { types: storyTypeFilter, query: search },
       ),
     [pages, search, storyTypeFilter],
@@ -688,9 +701,14 @@ export function Workspace({
   const chapterPages = useMemo(() => {
     const chapters = pages.filter((page) => page.pageType === "chapter");
     const query = search.trim().toLowerCase();
-    return query
-      ? chapters.filter((page) => page.title.toLowerCase().includes(query))
-      : chapters;
+    if (!query) return chapters;
+    return chapters.filter(
+      (chapter) =>
+        chapter.title.toLowerCase().includes(query) ||
+        chapterEventChildren(pages, chapter.id).some((event) =>
+          event.title.toLowerCase().includes(query),
+        ),
+    );
   }, [pages, search]);
   const scriptPages = useMemo(() => {
     const scripts = pages.filter((page) => page.pageType === "script");
@@ -734,16 +752,46 @@ export function Workspace({
         unvisited: !activate,
         updatedAt: Date.now(),
       };
-      setPages((current) => [...current, page]);
-      if (pageType === "chapter") setChaptersOpen(true);
+      setPages((current) => {
+        let next = [...current, page];
+        if (parentId && pageType === "event") {
+          const parent = next.find((candidate) => candidate.id === parentId);
+          if (parent?.pageType === "chapter") {
+            next = next.map((candidate) =>
+              candidate.id === parentId
+                ? {
+                    ...candidate,
+                    content: insertChapterEventMarker(
+                      candidate.content,
+                      page.id,
+                    ),
+                    updatedAt: Date.now(),
+                  }
+                : candidate,
+            );
+          }
+        }
+        return next;
+      });
+      if (pageType === "chapter" || (parentId && pageType === "event")) {
+        setChaptersOpen(true);
+      }
       if (pageType === "script") setScriptsOpen(true);
       if (parentId) {
         setExpanded((current) => new Set(current).add(parentId));
       }
       if (activate) setActiveId(page.id);
+      if (
+        parentId &&
+        pageType === "event" &&
+        parentId === activeId &&
+        !activate
+      ) {
+        setEditorNonce((current) => current + 1);
+      }
       return page;
     },
-    [blockReadOnly, denyPlan, pages.length, planAccess, readOnly],
+    [activeId, blockReadOnly, denyPlan, pages.length, planAccess, readOnly],
   );
 
   const movePage = useCallback(
@@ -753,11 +801,42 @@ export function Workspace({
         return;
       }
       setPages((current) => {
+        const dragged = current.find((page) => page.id === draggedId);
+        const oldParentId = dragged?.parentId ?? null;
         const next = applyPageDrop(current, draggedId, drop);
         if (!next) return current;
-        return next.map((page) =>
+        const moved = next.find((page) => page.id === draggedId);
+        let patched = next.map((page) =>
           page.id === draggedId ? { ...page, updatedAt: Date.now() } : page,
         );
+        if (dragged?.pageType === "event") {
+          if (oldParentId && oldParentId !== moved?.parentId) {
+            patched = patched.map((page) =>
+              page.id === oldParentId && page.pageType === "chapter"
+                ? {
+                    ...page,
+                    content: removeChapterEventMarker(page.content, draggedId),
+                    updatedAt: Date.now(),
+                  }
+                : page,
+            );
+          }
+          if (
+            moved?.parentId &&
+            moved.parentId !== oldParentId
+          ) {
+            patched = patched.map((page) =>
+              page.id === moved.parentId && page.pageType === "chapter"
+                ? {
+                    ...page,
+                    content: insertChapterEventMarker(page.content, draggedId),
+                    updatedAt: Date.now(),
+                  }
+                : page,
+            );
+          }
+        }
+        return patched;
       });
       if (drop.type === "inside") {
         setExpanded((current) => new Set(current).add(drop.targetId));
@@ -816,9 +895,10 @@ export function Workspace({
       }
       const node = document.elementFromPoint(event.clientX, event.clientY);
       const row = node?.closest<HTMLElement>("[data-page-id]");
-      const targetId = row?.dataset.pageId;
+      const chapterRow = node?.closest<HTMLElement>("[data-chapter-id]");
+      const targetId = row?.dataset.pageId ?? chapterRow?.dataset.chapterId;
       const ontoRoot = Boolean(node?.closest("[data-story-root]"));
-      if (row && targetId && targetId !== drag.pageId) {
+      if (targetId && targetId !== drag.pageId) {
         const drop: PageDrop = { type: "inside", targetId };
         const preview = applyPageDrop(pages, drag.pageId, drop);
         if (!preview) {
@@ -1158,32 +1238,61 @@ export function Workspace({
       blockReadOnly();
       return;
     }
-    setPages((current) =>
-      applyPageTypeChange(current, pageId, pageType).map((page) => {
+    setPages((current) => {
+      const previous = current.find((page) => page.id === pageId);
+      let next = applyPageTypeChange(current, pageId, pageType).map((page) => {
         if (page.id !== pageId) {
           return page.parentId === null
             ? { ...page, updatedAt: Date.now() }
             : page;
         }
+        let content =
+          pageType === "script"
+            ? htmlToScriptHtml(page.content)
+            : page.content;
+        if (previous?.pageType === "chapter" && pageType !== "chapter") {
+          content = syncChapterEventMarkers(content, []);
+        }
         return {
           ...page,
-          content:
-            pageType === "script"
-              ? htmlToScriptHtml(page.content)
-              : page.content,
+          content,
           fields: isTimelinePageType(pageType)
             ? page.fields
             : withoutTimelineY(page.fields),
           updatedAt: Date.now(),
         };
-      }),
-    );
+      });
+      if (pageType === "chapter") {
+        const eventIds = chapterEventChildren(next, pageId).map(
+          (event) => event.id,
+        );
+        next = next.map((page) =>
+          page.id === pageId
+            ? {
+                ...page,
+                content: syncChapterEventMarkers(page.content, eventIds),
+              }
+            : page,
+        );
+      }
+      return next;
+    });
     if (pageType === "chapter") setChaptersOpen(true);
     if (pageType === "script") {
       setScriptsOpen(true);
       setEditorNonce((current) => current + 1);
     }
   }, [blockReadOnly, readOnly]);
+
+  useEffect(() => {
+    if (!activePage || activePage.pageType !== "chapter" || readOnly) return;
+    const eventIds = chapterEventChildren(pages, activePage.id).map(
+      (event) => event.id,
+    );
+    const next = syncChapterEventMarkers(activePage.content, eventIds);
+    if (next === activePage.content) return;
+    updatePage(activePage.id, { content: next });
+  }, [activePage, pages, readOnly, updatePage]);
 
   const importChapterIntoScript = useCallback(
     (chapterId: string) => {
@@ -1697,7 +1806,7 @@ export function Workspace({
             </div>
           )}
 
-          <nav className="page-tree" aria-label="Story pages">
+          <nav className="page-tree" aria-label="Story pages" data-story-root="">
             {draggingId && dropTarget && (
               <div className="page-drop-hint" role="status">
                 {dropTarget.type === "inside"
@@ -1756,6 +1865,11 @@ export function Workspace({
                 })
               }
               onAdd={createPage}
+              onUnnest={
+                readOnly
+                  ? undefined
+                  : (id) => movePage(id, { type: "root" })
+              }
               onDelete={deletePage}
               onDragStart={startPageDrag}
               onDragMove={updatePageDrag}
@@ -1817,9 +1931,24 @@ export function Workspace({
                     Set a page type to Chapter, or add one here.
                   </p>
                 ) : (
-                  chapterPages.map((page) => (
+                  chapterPages.map((page) => {
+                    const nestedEvents = chapterEventChildren(pages, page.id);
+                    const selectPage = (id: string) => {
+                      setActiveId(id);
+                      setTagTargetId(null);
+                      setTagPickerTargetId(null);
+                      setPages((current) =>
+                        current.map((candidate) =>
+                          candidate.id === id && candidate.unvisited
+                            ? { ...candidate, unvisited: false }
+                            : candidate,
+                        ),
+                      );
+                      if (isNarrow) setSidebarOpen(false);
+                    };
+                    return (
+                      <div key={page.id} className="chapter-tree">
                     <div
-                      key={page.id}
                       data-chapter-id={page.id}
                       className={`page-row ${
                         activeId === page.id ? "active" : ""
@@ -1855,19 +1984,7 @@ export function Workspace({
                           .charAt(0)
                           .toUpperCase()}
                         title={page.title || "Untitled"}
-                        onClick={() => {
-                          setActiveId(page.id);
-                          setTagTargetId(null);
-                          setTagPickerTargetId(null);
-                          setPages((current) =>
-                            current.map((candidate) =>
-                              candidate.id === page.id && candidate.unvisited
-                                ? { ...candidate, unvisited: false }
-                                : candidate,
-                            ),
-                          );
-                          if (isNarrow) setSidebarOpen(false);
-                        }}
+                        onClick={() => selectPage(page.id)}
                       >
                         <BookOpen size={15} />
                         {page.unvisited && (
@@ -1878,6 +1995,19 @@ export function Workspace({
                         )}
                         <span>{page.title || "Untitled"}</span>
                       </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          className="row-add"
+                          aria-label={`Add event in ${page.title || "Untitled"}`}
+                          title="Add a nested event"
+                          onClick={() =>
+                            createPage(page.id, "Untitled", true, "event")
+                          }
+                        >
+                          <Plus size={13} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="row-delete"
@@ -1888,7 +2018,69 @@ export function Workspace({
                         <Trash2 size={13} />
                       </button>
                     </div>
-                  ))
+                    {nestedEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        data-page-id={event.id}
+                        className={`page-row chapter-event-row ${
+                          activeId === event.id ? "active" : ""
+                        } ${event.unvisited ? "unvisited" : ""} ${
+                          draggingId === event.id ? "dragging" : ""
+                        } ${
+                          dropTargetId(dropTarget) === event.id
+                            ? `drop-${dropTarget?.type}`
+                            : ""
+                        }`}
+                      >
+                        {sidebarMode !== "rail" && !search.trim() && (
+                          <button
+                            type="button"
+                            className="page-drag-handle"
+                            aria-label={`Move ${event.title || "Untitled"}`}
+                            title="Drag onto Your story to un-nest"
+                            onPointerDown={(pointer) =>
+                              startPageDrag(pointer, event.id)
+                            }
+                            onPointerMove={updatePageDrag}
+                            onPointerUp={finishPageDrag}
+                            onPointerCancel={finishPageDrag}
+                            onLostPointerCapture={finishPageDrag}
+                          >
+                            <GripVertical size={13} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="page-name"
+                          data-initial={(event.title || "Untitled")
+                            .charAt(0)
+                            .toUpperCase()}
+                          title={event.title || "Untitled"}
+                          onClick={() => selectPage(event.id)}
+                        >
+                          <Clock3 size={15} />
+                          {event.unvisited && (
+                            <span
+                              className="unvisited-page-dot"
+                              title="New page"
+                            />
+                          )}
+                          <span>{event.title || "Untitled"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="row-delete"
+                          aria-label={`Delete ${event.title}`}
+                          title="Delete event"
+                          onClick={() => deletePage(event.id)}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                      </div>
+                    );
+                  })
                 )}
               </nav>
             )}
@@ -2668,6 +2860,15 @@ export function Workspace({
               onTagTargetChange={setTagTargetId}
               onOpenTags={openTagPicker}
               onOpenRelate={openRelatePicker}
+              chapterEvents={
+                activePage.pageType === "chapter"
+                  ? chapterEventChildren(pages, activePage.id).map((event) => ({
+                      id: event.id,
+                      title: event.title,
+                      content: event.content,
+                    }))
+                  : undefined
+              }
               linkablePages={pages.map((page) => ({
                 id: page.id,
                 title: page.title,
@@ -2904,7 +3105,16 @@ export function Workspace({
             .map((page) => ({
               id: page.id,
               title: page.title,
-              content: page.content,
+              content:
+                exportKind === "script"
+                  ? page.content
+                  : expandChapterEventMarkers(
+                      page.content,
+                      chapterEventChildren(pages, page.id).map((event) => ({
+                        id: event.id,
+                        content: event.content,
+                      })),
+                    ),
             }))}
           onClose={() => setExportKind(null)}
         />
@@ -2927,6 +3137,7 @@ type PageBranchProps = {
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
   onAdd: (parentId: string, title?: string, activate?: boolean) => StoryPage | null;
+  onUnnest?: (id: string) => void;
   onDelete: (id: string) => void;
   onDragStart: (
     event: ReactPointerEvent<HTMLButtonElement>,
@@ -2948,6 +3159,7 @@ function PageBranch({
   onSelect,
   onToggle,
   onAdd,
+  onUnnest,
   onDelete,
   onDragStart,
   onDragMove,
@@ -3011,6 +3223,17 @@ function PageBranch({
               )}
               <span>{page.title || "Untitled"}</span>
             </button>
+            {page.parentId && onUnnest && (
+              <button
+                type="button"
+                className="row-unnest"
+                aria-label={`Un-nest ${page.title || "Untitled"}`}
+                title="Move to Your story"
+                onClick={() => onUnnest(page.id)}
+              >
+                <ListIndentDecrease size={14} />
+              </button>
+            )}
             <button
               type="button"
               className="row-add"
@@ -3043,6 +3266,7 @@ function PageBranch({
                 onSelect={onSelect}
                 onToggle={onToggle}
                 onAdd={onAdd}
+                onUnnest={onUnnest}
                 onDelete={onDelete}
                 onDragStart={onDragStart}
                 onDragMove={onDragMove}

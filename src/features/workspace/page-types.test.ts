@@ -59,6 +59,17 @@ describe("page types and chapter order", () => {
     expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
   });
 
+  it("keeps nested events when a page becomes a chapter", () => {
+    const withEvent = [
+      { id: "notes", parentId: null, pageType: "page" as const },
+      { id: "storm", parentId: "notes", pageType: "event" as const },
+      { id: "mara", parentId: "notes", pageType: "page" as const },
+    ];
+    const next = applyPageTypeChange(withEvent, "notes", "chapter");
+    expect(next.find((page) => page.id === "storm")?.parentId).toBe("notes");
+    expect(next.find((page) => page.id === "mara")?.parentId).toBeNull();
+  });
+
   it("keeps an event nested in the page tree", () => {
     const next = applyPageTypeChange(pages, "mara", "event");
     expect(next.find((page) => page.id === "mara")?.pageType).toBe("event");

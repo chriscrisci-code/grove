@@ -1,6 +1,7 @@
 export type TreePage = {
   id: string;
   parentId: string | null;
+  pageType?: string;
 };
 
 export type PageDrop =
@@ -114,6 +115,10 @@ export function applyPageDrop<T extends TreePage>(
     if (!target || draggedId === drop.targetId) return null;
     if (isDescendantOf(pages, draggedId, drop.targetId)) return null;
     if (dragged.parentId === target.id) return null;
+    if (target.pageType === "script") return null;
+    if (target.pageType === "chapter" && dragged.pageType !== "event") {
+      return null;
+    }
     newParentId = target.id;
   } else {
     return null;
@@ -181,6 +186,7 @@ export function applyPageTypeChange<
       };
     }
     if (enteringList && page.parentId === pageId) {
+      if (pageType === "chapter" && page.pageType === "event") return page;
       return { ...page, parentId: null };
     }
     return page;

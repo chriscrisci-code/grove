@@ -70,6 +70,26 @@ describe("page tree drops", () => {
     ).toBeNull();
   });
 
+  it("nests only events inside a chapter", () => {
+    const withChapter = [
+      ...pages,
+      { id: "ch1", parentId: null, title: "One", pageType: "chapter" },
+      { id: "storm", parentId: null, title: "Storm", pageType: "event" },
+    ];
+    expect(
+      applyPageDrop(withChapter, "mara", {
+        type: "inside",
+        targetId: "ch1",
+      }),
+    ).toBeNull();
+    expect(
+      applyPageDrop(withChapter, "storm", {
+        type: "inside",
+        targetId: "ch1",
+      })?.find((page) => page.id === "storm")?.parentId,
+    ).toBe("ch1");
+  });
+
   it("knows descendant relationships", () => {
     expect(isDescendantOf(pages, "characters", "mara")).toBe(true);
     expect(isDescendantOf(pages, "mara", "characters")).toBe(false);

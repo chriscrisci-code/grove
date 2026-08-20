@@ -60,11 +60,11 @@ const SECTIONS = [
     items: [
       {
         keys: ["Type"],
-        text: "Set a page to Script, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events stay in Your story. Scripts live in the Scripts list, like Chapters.",
+        text: "Set a page to Script, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events live in Your story, or nested under a Chapter. Scripts live in the Scripts list, like Chapters.",
       },
       {
         keys: ["Chapters"],
-        text: "Chapter pages live only in the Chapters list. Drag order is manuscript order. The printer icon prints chapters to PDF.",
+        text: "Chapter pages live only in the Chapters list. Drag order is manuscript order. Nested Events appear under their chapter and as movable blocks in the chapter text. The printer icon prints chapters to PDF.",
       },
     ],
   },
@@ -123,7 +123,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["+"],
-        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. The plus beside Chapters or Scripts adds to that list. Pages list A to Z, with subpages under their parent. Drag onto a title to nest, or onto Your story to un-nest. Filter by page type.",
+        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. The plus beside Chapters or Scripts adds to that list. The plus on a Chapter row nests an Event in that chapter. Pages list A to Z, with subpages under their parent. Drag onto a title to nest. Nested pages have an un-nest control, and you can also drag onto Your story. Filter by page type.",
       },
       {
         keys: ["Research"],

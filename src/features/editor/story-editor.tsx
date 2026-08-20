@@ -18,7 +18,13 @@ import {
   Quote,
   Tag,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChapterEvent,
+  ChapterEventContext,
+  type ChapterEventInfo,
+} from "@/features/editor/chapter-event-node";
+import { eventIdsInChapterHtml } from "@/features/editor/chapter-events";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
 import {
   mergeDictationTranscript,
@@ -88,6 +94,8 @@ type StoryEditorProps = {
   onOpenTags: (pageId: string | null) => void;
   onOpenRelate: (pageId: string | null) => void;
   onNavigatePage: (pageId: string) => void;
+  chapterEvents?: ChapterEventInfo[];
+  onEventMarkersChange?: (eventIds: string[]) => void;
   linkablePages: { id: string; title: string; aliases?: string[] }[];
   currentPageId: string;
   onFindLinks: (count: number) => void;
@@ -105,6 +113,8 @@ export function StoryEditor({
   onOpenTags,
   onOpenRelate,
   onNavigatePage,
+  chapterEvents,
+  onEventMarkersChange,
   linkablePages,
   currentPageId,
   onFindLinks,
@@ -137,6 +147,7 @@ export function StoryEditor({
       Placeholder.configure({
         placeholder: "Begin writing, or type / for commands…",
       }),
+      ...(chapterEvents ? [ChapterEvent] : []),
     ],
     content,
     editable: !readOnly,
@@ -147,7 +158,10 @@ export function StoryEditor({
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
-      if (!readOnly) onChange(currentEditor.getHTML());
+      if (readOnly) return;
+      const html = currentEditor.getHTML();
+      onChange(html);
+      onEventMarkersChange?.(eventIdsInChapterHtml(html));
     },
     onSelectionUpdate: ({ editor: currentEditor, transaction }) => {
       if (transaction.docChanged) return;
@@ -171,6 +185,12 @@ export function StoryEditor({
   useEffect(() => {
     editor?.setEditable(!readOnly);
   }, [editor, readOnly]);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    if (editor.getHTML() === content) return;
+    editor.commands.setContent(content, { emitUpdate: false });
+  }, [content, editor]);
 
   useEffect(() => {
     queueMicrotask(() =>
@@ -499,6 +519,14 @@ export function StoryEditor({
     openTagCommand,
   ]);
 
+  const chapterEventValue = useMemo(
+    () => ({
+      events: chapterEvents ?? [],
+      onOpenEvent: onNavigatePage,
+    }),
+    [chapterEvents, onNavigatePage],
+  );
+
   if (!editor) return <div className="editor-loading">Opening your page…</div>;
   const dictationEditor = editor;
 
@@ -820,19 +848,21 @@ export function StoryEditor({
           )}
         </div>
       )}
-      <div
-        onClick={(event) => {
-          const target = event.target;
-          if (!(target instanceof Element)) return;
-          const link = target.closest<HTMLAnchorElement>("a.story-link");
-          const match = link?.getAttribute("href")?.match(/^#page-(.+)$/);
-          if (!match) return;
-          event.preventDefault();
-          onNavigatePage(match[1]);
-        }}
-      >
-        <EditorContent editor={editor} />
-      </div>
+      <ChapterEventContext.Provider value={chapterEventValue}>
+        <div
+          onClick={(event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            const link = target.closest<HTMLAnchorElement>("a.story-link");
+            const match = link?.getAttribute("href")?.match(/^#page-(.+)$/);
+            if (!match) return;
+            event.preventDefault();
+            onNavigatePage(match[1]);
+          }}
+        >
+          <EditorContent editor={editor} />
+        </div>
+      </ChapterEventContext.Provider>
       {wordMenu && (
         <WordMenu
           word={wordMenu.word}

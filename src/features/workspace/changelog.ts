@@ -3,6 +3,8 @@ export const CHANGELOG = [
     date: "August 20, 2026",
     items: [
       "Research on each page accepts dropped JPEG, PNG, and WebP images alongside saved links.",
+      "Events nested under a Chapter appear in the Chapters list and as movable blocks in the chapter.",
+      "Nested pages in Your story can be moved back to the top with an un-nest control.",
     ],
   },
   {

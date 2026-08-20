@@ -81,6 +81,10 @@ import {
 } from "@/features/billing/plan";
 import { createClient } from "@/lib/supabase/client";
 import {
+  RESEARCH_IMAGES_BUCKET,
+  researchImagePathsForPages,
+} from "@/features/research/research-images";
+import {
   applyPageDrop,
   applyPageTypeChange,
   dropPlacementFromOffset,
@@ -1464,10 +1468,23 @@ export function Workspace({
       deletedIds.forEach((deletedId) => deletingIds.current.add(deletedId));
 
       if (cloudMode) {
-        const { error } = await createClient()
-          .from("pages")
-          .delete()
-          .eq("id", id);
+        const supabase = createClient();
+        const researchPaths = await researchImagePathsForPages(supabase, [
+          ...deletedIds,
+        ]);
+        if (researchPaths.length) {
+          const { error: storageError } = await supabase.storage
+            .from(RESEARCH_IMAGES_BUCKET)
+            .remove(researchPaths);
+          if (storageError) {
+            deletedIds.forEach((deletedId) =>
+              deletingIds.current.delete(deletedId),
+            );
+            setNotice("This page could not be deleted.");
+            return;
+          }
+        }
+        const { error } = await supabase.from("pages").delete().eq("id", id);
         if (error) {
           deletedIds.forEach((deletedId) =>
             deletingIds.current.delete(deletedId),

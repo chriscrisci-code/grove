@@ -1,5 +1,11 @@
 export const CHANGELOG = [
   {
+    date: "August 20, 2026",
+    items: [
+      "Research on each page accepts dropped JPEG, PNG, and WebP images alongside saved links.",
+    ],
+  },
+  {
     date: "August 18, 2026",
     items: [
       "Grove Plus checkout now uses Stripe. Webhooks keep the plan in sync, and Account & billing opens the customer portal.",

@@ -5,23 +5,31 @@ import {
   ArrowLeft,
   ExternalLink,
   Globe2,
+  ImagePlus,
   LoaderCircle,
   Search,
   Trash2,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import {
+  DragEvent,
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { createClient } from "@/lib/supabase/client";
-
-type ResearchLink = {
-  id: string;
-  url: string;
-  title: string;
-  description: string | null;
-  imageUrl: string | null;
-  faviconUrl: string | null;
-  createdAt: string;
-};
+import {
+  RESEARCH_IMAGE_ACCEPT,
+  RESEARCH_IMAGE_URL,
+  RESEARCH_IMAGES_BUCKET,
+  attachSignedImageUrls,
+  collectImageFiles,
+  isResearchImage,
+  researchImageTitle,
+  type ResearchItem,
+  type ResearchKind,
+} from "@/features/research/research-images";
 
 type SearchResult = {
   title: string;
@@ -40,11 +48,54 @@ type ResearchViewProps = {
   onClose: () => void;
 };
 
+type ResearchRow = {
+  id: string;
+  kind?: string | null;
+  url: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  favicon_url: string | null;
+  storage_path?: string | null;
+  created_at: string;
+};
+
 function webpageUrl(value: string) {
   const trimmed = value.trim();
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (!trimmed.includes(" ") && trimmed.includes(".")) return `https://${trimmed}`;
   return null;
+}
+
+function mapRow(row: ResearchRow): ResearchItem {
+  const kind: ResearchKind = row.kind === "image" ? "image" : "link";
+  return {
+    id: row.id,
+    kind,
+    url: row.url,
+    title: row.title,
+    description: row.description,
+    imageUrl: row.image_url,
+    faviconUrl: row.favicon_url,
+    storagePath: row.storage_path ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+async function fileAsDataUrl(file: File) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("The image could not be read."));
+    };
+    reader.onerror = () => reject(new Error("The image could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function persistLocal(pageId: string, items: ResearchItem[]) {
+  localStorage.setItem(`grove-research:${pageId}`, JSON.stringify(items));
 }
 
 export function ResearchView({
@@ -55,45 +106,68 @@ export function ResearchView({
   readOnly = false,
   onClose,
 }: ResearchViewProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
   const [query, setQuery] = useState("");
-  const [links, setLinks] = useState<ResearchLink[]>([]);
+  const [links, setLinks] = useState<ResearchItem[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [activeResult, setActiveResult] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       if (cloudMode) {
-        const { data, error } = await createClient()
+        const supabase = createClient();
+        const { data, error } = await supabase
           .from("research_links")
           .select(
-            "id,url,title,description,image_url,favicon_url,created_at",
+            "id,kind,url,title,description,image_url,favicon_url,storage_path,created_at",
           )
           .eq("page_id", pageId)
           .order("created_at", { ascending: false });
         if (!cancelled) {
           if (error) setMessage("Research could not be loaded.");
-          setLinks(
-            (data ?? []).map((link) => ({
-              id: link.id,
-              url: link.url,
-              title: link.title,
-              description: link.description,
-              imageUrl: link.image_url,
-              faviconUrl: link.favicon_url,
-              createdAt: link.created_at,
-            })),
-          );
+          const mapped = (data ?? []).map((row) => mapRow(row as ResearchRow));
+          const paths = mapped
+            .map((item) => item.storagePath)
+            .filter((path): path is string => Boolean(path));
+          if (paths.length) {
+            const { data: signed } = await supabase.storage
+              .from(RESEARCH_IMAGES_BUCKET)
+              .createSignedUrls(paths, 3600);
+            setLinks(
+              attachSignedImageUrls(
+                mapped,
+                (signed ?? []).flatMap((entry) => {
+                  const signedUrl = entry.signedUrl ?? entry.signedURL;
+                  return entry.path && signedUrl
+                    ? [{ path: entry.path, signedUrl }]
+                    : [];
+                }),
+              ),
+            );
+          } else {
+            setLinks(mapped);
+          }
         }
       } else {
         const stored = localStorage.getItem(`grove-research:${pageId}`);
         if (!cancelled && stored) {
           try {
-            setLinks(JSON.parse(stored) as ResearchLink[]);
+            const parsed = JSON.parse(stored) as ResearchItem[];
+            setLinks(
+              parsed.map((item) => ({
+                ...item,
+                kind: item.kind === "image" ? "image" : "link",
+                storagePath: item.storagePath ?? null,
+              })),
+            );
           } catch {
             localStorage.removeItem(`grove-research:${pageId}`);
           }
@@ -161,13 +235,14 @@ export function ResearchView({
       };
       if (!response.ok) throw new Error(preview.error || "The link could not be saved.");
 
-      let saved: ResearchLink;
+      let saved: ResearchItem;
       if (cloudMode && userId) {
         const { data, error } = await createClient()
           .from("research_links")
           .insert({
             page_id: pageId,
             created_by: userId,
+            kind: "link",
             url: preview.url,
             title: preview.title,
             description: preview.description || null,
@@ -175,33 +250,24 @@ export function ResearchView({
             favicon_url: preview.faviconUrl,
           })
           .select(
-            "id,url,title,description,image_url,favicon_url,created_at",
+            "id,kind,url,title,description,image_url,favicon_url,storage_path,created_at",
           )
           .single();
         if (error || !data) throw new Error("The link could not be stored.");
-        saved = {
-          id: data.id,
-          url: data.url,
-          title: data.title,
-          description: data.description,
-          imageUrl: data.image_url,
-          faviconUrl: data.favicon_url,
-          createdAt: data.created_at,
-        };
+        saved = mapRow(data as ResearchRow);
       } else {
         saved = {
           id: crypto.randomUUID(),
+          kind: "link",
           url: preview.url,
           title: preview.title,
           description: preview.description || null,
           imageUrl: preview.imageUrl,
           faviconUrl: preview.faviconUrl,
+          storagePath: null,
           createdAt: new Date().toISOString(),
         };
-        localStorage.setItem(
-          `grove-research:${pageId}`,
-          JSON.stringify([saved, ...links]),
-        );
+        persistLocal(pageId, [saved, ...links]);
       }
       setLinks((current) => [saved, ...current]);
       if (value === query) setQuery("");
@@ -213,29 +279,138 @@ export function ResearchView({
     }
   }
 
+  async function saveImages(files: File[]) {
+    if (readOnly) {
+      setMessage("Research is read-only for this story.");
+      return;
+    }
+    const images = collectImageFiles(files);
+    if (!images.length) {
+      setMessage("Drop a JPEG, PNG, or WebP image.");
+      return;
+    }
+    setUploading(true);
+    setMessage("");
+    const savedItems: ResearchItem[] = [];
+    try {
+      for (const file of images) {
+        if (cloudMode) {
+          const body = new FormData();
+          body.set("pageId", pageId);
+          body.set("image", file);
+          const response = await fetch("/api/research/image", {
+            method: "POST",
+            body,
+          });
+          const saved = (await response.json()) as ResearchItem & {
+            error?: string;
+          };
+          if (!response.ok) {
+            throw new Error(saved.error || "The image could not be saved.");
+          }
+          savedItems.push({
+            ...saved,
+            kind: "image",
+            storagePath: saved.storagePath ?? null,
+          });
+        } else {
+          const imageUrl = await fileAsDataUrl(file);
+          savedItems.push({
+            id: crypto.randomUUID(),
+            kind: "image",
+            url: RESEARCH_IMAGE_URL,
+            title: researchImageTitle(file.name),
+            description: null,
+            imageUrl,
+            faviconUrl: null,
+            storagePath: null,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+      if (!cloudMode) {
+        try {
+          persistLocal(pageId, [...savedItems, ...links]);
+        } catch {
+          throw new Error("This image is too large to keep in the demo.");
+        }
+      }
+      setLinks((current) => [...savedItems, ...current]);
+      setMessage(
+        savedItems.length === 1
+          ? "Image saved to this page."
+          : `${savedItems.length} images saved to this page.`,
+      );
+    } catch (error) {
+      if (savedItems.length && cloudMode) {
+        setLinks((current) => [...savedItems, ...current]);
+      }
+      setMessage(
+        error instanceof Error ? error.message : "The image could not be saved.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function removeLink(id: string) {
     if (readOnly) {
       setMessage("Research is read-only for this story.");
       return;
     }
+    const target = links.find((item) => item.id === id);
     if (cloudMode) {
-      const { error } = await createClient()
-        .from("research_links")
-        .delete()
-        .eq("id", id);
+      const supabase = createClient();
+      if (target?.storagePath) {
+        const { error: storageError } = await supabase.storage
+          .from(RESEARCH_IMAGES_BUCKET)
+          .remove([target.storagePath]);
+        if (storageError) {
+          setMessage("The saved image could not be removed.");
+          return;
+        }
+      }
+      const { error } = await supabase.from("research_links").delete().eq("id", id);
       if (error) {
-        setMessage("The saved link could not be removed.");
+        setMessage("The saved item could not be removed.");
         return;
       }
     }
-    const remaining = links.filter((link) => link.id !== id);
+    const remaining = links.filter((item) => item.id !== id);
     setLinks(remaining);
-    if (!cloudMode) {
-      localStorage.setItem(
-        `grove-research:${pageId}`,
-        JSON.stringify(remaining),
-      );
-    }
+    if (!cloudMode) persistLocal(pageId, remaining);
+  }
+
+  function hasFiles(event: DragEvent) {
+    return event.dataTransfer.types.includes("Files");
+  }
+
+  function onDragEnter(event: DragEvent<HTMLElement>) {
+    if (readOnly || !hasFiles(event)) return;
+    event.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }
+
+  function onDragOver(event: DragEvent<HTMLElement>) {
+    if (readOnly || !hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function onDragLeave(event: DragEvent<HTMLElement>) {
+    if (readOnly || !hasFiles(event)) return;
+    event.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }
+
+  function onDrop(event: DragEvent<HTMLElement>) {
+    if (readOnly) return;
+    event.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    void saveImages([...event.dataTransfer.files]);
   }
 
   return (
@@ -245,8 +420,8 @@ export function ResearchView({
           <span className="eyebrow">RESEARCH FOR</span>
           <h1>{pageTitle}</h1>
           <p>
-            Search and read the web without leaving Grove. Save useful sources
-            here to keep them with this entry.
+            Search the web, save a source, or drop an image onto this page.
+            Saved research stays with this entry.
           </p>
         </div>
         <button
@@ -365,11 +540,51 @@ export function ResearchView({
         </div>
       )}
 
-      <div className="research-library">
+      <div
+        className={`research-library${dragging ? " dragging" : ""}`}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
         <div className="research-library-heading">
           <h2>Saved sources</h2>
-          <span>{links.length} {links.length === 1 ? "source" : "sources"}</span>
+          <div className="research-library-actions">
+            <span>{links.length} {links.length === 1 ? "source" : "sources"}</span>
+            {!readOnly && (
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading ? (
+                  <LoaderCircle className="spin" size={14} />
+                ) : (
+                  <ImagePlus size={14} />
+                )}
+                {uploading ? "Saving…" : "Add image"}
+              </button>
+            )}
+          </div>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={RESEARCH_IMAGE_ACCEPT}
+          multiple
+          hidden
+          onChange={(event) => {
+            void saveImages([...(event.target.files ?? [])]);
+            event.target.value = "";
+          }}
+        />
+        {dragging && !readOnly && (
+          <div className="research-drop-hint">
+            <ImagePlus size={22} />
+            Drop images onto this page
+          </div>
+        )}
         {loading ? (
           <div className="research-empty">
             <LoaderCircle className="spin" size={21} />
@@ -377,44 +592,66 @@ export function ResearchView({
           </div>
         ) : links.length ? (
           <div className="research-grid">
-            {links.map((link) => (
-              <article className="research-card" key={link.id}>
-                <a href={link.url} target="_blank" rel="noreferrer">
+            {links.map((item) => {
+              const image = isResearchImage(item);
+              const href = image ? item.imageUrl : item.url;
+              const domain = image
+                ? "Image"
+                : new URL(item.url).hostname.replace(/^www\./, "");
+              const card = (
+                <>
                   <div className="research-thumbnail">
-                    {link.imageUrl ? (
-                      <img src={link.imageUrl} alt="" />
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt="" />
+                    ) : image ? (
+                      <ImagePlus size={30} />
                     ) : (
                       <Globe2 size={30} />
                     )}
                   </div>
                   <div className="research-card-copy">
                     <div className="research-domain">
-                      {link.faviconUrl && <img src={link.faviconUrl} alt="" />}
-                      {new URL(link.url).hostname.replace(/^www\./, "")}
+                      {!image && item.faviconUrl && (
+                        <img src={item.faviconUrl} alt="" />
+                      )}
+                      {domain}
                     </div>
-                    <h3>{link.title}</h3>
-                    {link.description && <p>{link.description}</p>}
+                    <h3>{item.title}</h3>
+                    {item.description && <p>{item.description}</p>}
                   </div>
-                </a>
-                {!readOnly && (
-                  <button
-                    type="button"
-                    className="research-delete"
-                    onClick={() => void removeLink(link.id)}
-                    aria-label={`Remove ${link.title}`}
-                    title="Remove saved link"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </article>
-            ))}
+                </>
+              );
+              return (
+                <article className="research-card" key={item.id}>
+                  {href ? (
+                    <a href={href} target="_blank" rel="noreferrer">
+                      {card}
+                    </a>
+                  ) : (
+                    <div>{card}</div>
+                  )}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      className="research-delete"
+                      onClick={() => void removeLink(item.id)}
+                      aria-label={`Remove ${item.title}`}
+                      title="Remove saved item"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="research-empty">
             <Globe2 size={30} />
             <h3>No saved research yet</h3>
-            <p>Search for something above, then paste and save a useful URL.</p>
+            <p>
+              Search above, save a URL, or drop a JPEG, PNG, or WebP image here.
+            </p>
           </div>
         )}
       </div>

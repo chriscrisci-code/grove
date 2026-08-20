@@ -1,3 +1,7 @@
+import {
+  RESEARCH_IMAGES_BUCKET,
+  researchImagePathsForWorkspaces,
+} from "@/features/research/research-images";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +16,7 @@ export async function DELETE() {
 
   const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("cover_path,geography_background_path")
+    .select("id,cover_path,geography_background_path")
     .eq("owner_id", user.id);
 
   const coverPaths = (workspaces ?? [])
@@ -21,16 +25,23 @@ export async function DELETE() {
   const geographyPaths = (workspaces ?? [])
     .map((workspace) => workspace.geography_background_path)
     .filter((path): path is string => Boolean(path));
+  const researchPaths = await researchImagePathsForWorkspaces(
+    supabase,
+    (workspaces ?? []).map((workspace) => workspace.id),
+  );
 
-  const [coverRemoval, geographyRemoval] = await Promise.all([
+  const [coverRemoval, geographyRemoval, researchRemoval] = await Promise.all([
     coverPaths.length
       ? supabase.storage.from("workspace-covers").remove(coverPaths)
       : Promise.resolve({ error: null }),
     geographyPaths.length
       ? supabase.storage.from("workspace-geography").remove(geographyPaths)
       : Promise.resolve({ error: null }),
+    researchPaths.length
+      ? supabase.storage.from(RESEARCH_IMAGES_BUCKET).remove(researchPaths)
+      : Promise.resolve({ error: null }),
   ]);
-  if (coverRemoval.error || geographyRemoval.error) {
+  if (coverRemoval.error || geographyRemoval.error || researchRemoval.error) {
     return Response.json(
       { error: "Story images could not be removed. Please try again." },
       { status: 500 },

@@ -127,7 +127,7 @@ const SECTIONS = [
       },
       {
         keys: ["Research"],
-        text: "Search and save sources for the current page.",
+        text: "Search and save sources for the current page, or drop a JPEG, PNG, or WebP image onto Research.",
       },
       {
         keys: ["Relationships"],

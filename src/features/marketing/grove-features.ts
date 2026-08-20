@@ -73,7 +73,7 @@ export const GROVE_FEATURES: GroveFeature[] = [
     summary:
       "Find and save sources in the same workspace as the page they inform, instead of losing them in another app.",
     detail:
-      "Open Research from the page you are writing. Search, save a source with its link, and come back to it without leaving Grove. Research stays attached to that page.",
+      "Open Research from the page you are writing. Search, save a source with its link, or drop an image onto that page. Research stays attached to the entry.",
   },
   {
     icon: Users,

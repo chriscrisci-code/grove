@@ -1,3 +1,7 @@
+import {
+  RESEARCH_IMAGES_BUCKET,
+  researchImagePathsForWorkspaces,
+} from "@/features/research/research-images";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -25,7 +29,10 @@ export async function DELETE(
     );
   }
 
-  const [coverRemoval, geographyRemoval] = await Promise.all([
+  const researchPaths = await researchImagePathsForWorkspaces(supabase, [
+    workspaceId,
+  ]);
+  const [coverRemoval, geographyRemoval, researchRemoval] = await Promise.all([
     workspace.cover_path
       ? supabase.storage.from("workspace-covers").remove([workspace.cover_path])
       : Promise.resolve({ error: null }),
@@ -34,8 +41,11 @@ export async function DELETE(
           .from("workspace-geography")
           .remove([workspace.geography_background_path])
       : Promise.resolve({ error: null }),
+    researchPaths.length
+      ? supabase.storage.from(RESEARCH_IMAGES_BUCKET).remove(researchPaths)
+      : Promise.resolve({ error: null }),
   ]);
-  if (coverRemoval.error || geographyRemoval.error) {
+  if (coverRemoval.error || geographyRemoval.error || researchRemoval.error) {
     return Response.json(
       { error: "The project images could not be removed. Try again." },
       { status: 500 },

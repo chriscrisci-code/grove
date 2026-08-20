@@ -68,11 +68,28 @@ export function expandChapterEventMarkers(
 }
 
 export function chapterEventChildren<
-  T extends { id: string; parentId: string | null; pageType: string },
+  T extends {
+    id: string;
+    parentId: string | null;
+    pageType: string;
+    content?: string;
+  },
 >(pages: T[], chapterId: string) {
-  return pages.filter(
+  const nested = pages.filter(
     (page) => page.parentId === chapterId && page.pageType === "event",
   );
+  const order = eventIdsInChapterHtml(
+    pages.find((page) => page.id === chapterId)?.content ?? "",
+  );
+  if (order.length === 0) return nested;
+  return [...nested].sort((left, right) => {
+    const leftIndex = order.indexOf(left.id);
+    const rightIndex = order.indexOf(right.id);
+    if (leftIndex === -1 && rightIndex === -1) return 0;
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+  });
 }
 
 export function isChapterNestedEvent<

@@ -1,7 +1,7 @@
 import { CHAPTER_EVENT_TYPE } from "./chapter-events";
 
-export const DRAG_SCROLL_EDGE = 88;
-export const DRAG_SCROLL_MAX_SPEED = 28;
+export const DRAG_SCROLL_EDGE = 160;
+export const DRAG_SCROLL_MAX_SPEED = 32;
 
 export function dragScrollDelta(
   clientY: number,
@@ -48,12 +48,12 @@ export function closestVerticalScroller(start: Element | null) {
 
 export function writingScrollBounds(scroller: HTMLElement) {
   const pane = scroller.getBoundingClientRect();
-  let top = pane.top;
-  for (const selector of [".topbar", ".editor-toolbar"]) {
-    const chrome = scroller.querySelector(selector);
-    if (chrome) top = Math.max(top, chrome.getBoundingClientRect().bottom);
-  }
-  return { top, bottom: pane.bottom };
+  return { top: pane.top, bottom: pane.bottom };
+}
+
+export function readDragClientY(event: DragEvent, fallback: number) {
+  if (event.clientY === 0 && event.clientX === 0) return fallback;
+  return event.clientY;
 }
 
 export const CHAPTER_EVENT_DRAGGING_CLASS = "dragging-chapter-event";
@@ -68,17 +68,23 @@ export function watchChapterEventDragScroll() {
     if (!(origin instanceof Element)) return;
     if (!origin.closest(`[data-type="${CHAPTER_EVENT_TYPE}"]`)) return;
 
-    const scroller =
+    const found =
       origin.closest(".document-pane") ?? closestVerticalScroller(origin);
-    if (!scroller) return;
+    if (!(found instanceof HTMLElement)) return;
+    const scroller = found;
 
     let y = event.clientY;
     let active = true;
     let releaseTimer = 0;
+    let scrollTimer = 0;
     document.body.classList.add(CHAPTER_EVENT_DRAGGING_CLASS);
 
+    const trackY = (next: DragEvent) => {
+      y = readDragClientY(next, y);
+    };
     const onDragOver = (next: DragEvent) => {
-      y = next.clientY;
+      next.preventDefault();
+      trackY(next);
     };
     const swallowClick = (click: Event) => {
       if (!isChapterEventDragging()) return;
@@ -87,7 +93,9 @@ export function watchChapterEventDragScroll() {
     };
     const stop = () => {
       active = false;
+      window.clearInterval(scrollTimer);
       document.removeEventListener("dragover", onDragOver, true);
+      document.removeEventListener("drag", trackY, true);
       window.removeEventListener("dragend", stop);
       window.removeEventListener("drop", stop);
       window.clearTimeout(releaseTimer);
@@ -98,18 +106,17 @@ export function watchChapterEventDragScroll() {
     };
 
     document.addEventListener("dragover", onDragOver, true);
+    document.addEventListener("drag", trackY, true);
     document.addEventListener("click", swallowClick, true);
     window.addEventListener("dragend", stop);
     window.addEventListener("drop", stop);
 
-    const tick = () => {
+    scrollTimer = window.setInterval(() => {
       if (!active) return;
       const { top, bottom } = writingScrollBounds(scroller);
       const delta = dragScrollDelta(y, top, bottom);
       if (delta) scroller.scrollTop += delta;
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    }, 16);
   };
 
   document.addEventListener("dragstart", onDragStart, true);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  chapterEventChildren,
   chapterEventMarkerHtml,
   eventIdsInChapterHtml,
   expandChapterEventMarkers,
@@ -46,5 +47,22 @@ describe("chapter event markers", () => {
     expect(expanded).not.toContain("manuscript-event");
     expect(expanded).not.toContain("<h3>");
     expect(expanded).not.toContain("chapter-event");
+  });
+
+  it("lists nested events in chapter text order", () => {
+    const pages = [
+      {
+        id: "ch1",
+        parentId: null,
+        pageType: "chapter",
+        content: `<p>Open.</p>${chapterEventMarkerHtml("b")}<p>Mid.</p>${chapterEventMarkerHtml("a")}`,
+      },
+      { id: "a", parentId: "ch1", pageType: "event" },
+      { id: "b", parentId: "ch1", pageType: "event" },
+    ];
+    expect(chapterEventChildren(pages, "ch1").map((page) => page.id)).toEqual([
+      "b",
+      "a",
+    ]);
   });
 });

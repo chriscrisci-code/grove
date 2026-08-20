@@ -200,7 +200,7 @@ export function PricingPage({
           <span className="eyebrow">NO CARD REQUIRED</span>
           <h2>Start with the story already asking to be written.</h2>
             <Link href="/sign-up" className="marketing-primary-cta">
-              Sign up for the beta
+              Start writing
               <ArrowRight size={17} />
             </Link>
         </section>

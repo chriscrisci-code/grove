@@ -32,7 +32,7 @@ export function LandingPage() {
       <main>
         <section className="marketing-hero">
           <div className="marketing-hero-copy">
-            <span className="eyebrow">COMING SOON · OPEN BETA</span>
+            <span className="eyebrow">A CONNECTED WRITING SPACE</span>
             <h1>Keep your whole story connected.</h1>
             <p>
               Write chapters, tend the world beside them, and open a Script
@@ -41,14 +41,14 @@ export function LandingPage() {
             </p>
             <div className="marketing-cta-row">
               <Link href="/sign-up" className="marketing-primary-cta">
-                Sign up for the beta
+                Start writing
                 <ArrowRight size={17} />
               </Link>
               <Link href="/features" className="marketing-secondary-cta">
                 See how Grove works
               </Link>
             </div>
-            <small>Beta test is free · No credit card · One story to start</small>
+            <small>Free to start · No credit card · One story</small>
           </div>
           <ProductPreview />
         </section>
@@ -149,12 +149,12 @@ export function LandingPage() {
         </section>
 
         <section className="marketing-final-cta">
-          <span className="eyebrow">BETA TEST FOR FREE</span>
-          <h2>Coming soon. Sign up and start writing now.</h2>
-          <p>Open beta includes one story and fifty pages. No credit card required.</p>
+          <span className="eyebrow">START WITH GROVE FREE</span>
+          <h2>Sign up and start writing.</h2>
+          <p>Grove Free includes one story and fifty pages. No credit card required.</p>
           <div className="marketing-cta-row">
             <Link href="/sign-up" className="marketing-primary-cta">
-              Sign up for the beta
+              Start writing
               <ArrowRight size={17} />
             </Link>
             <Link href="/pricing" className="marketing-secondary-cta">

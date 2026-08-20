@@ -4,7 +4,7 @@ import { FeaturesPage } from "@/features/marketing/features-page";
 export const metadata: Metadata = {
   title: "Features",
   description:
-    "Grove features for long fiction: chapters, script format, linked world pages, timeline, relationships, research, and review. Open beta is free to try.",
+    "Grove features for long fiction: chapters, script format, linked world pages, timeline, relationships, research, and review. Free to start.",
   alternates: { canonical: "/features" },
 };
 

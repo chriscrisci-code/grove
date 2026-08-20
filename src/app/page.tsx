@@ -6,12 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = {
   title: "Keep your whole story connected",
   description:
-    "Coming soon. Grove is in open beta: write chapters, keep a world bible, and draft in script format. Sign up and test it for free.",
+    "Grove is a connected writing space: write chapters, keep a world bible, and draft in script format. Free to start.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Grove · Keep your whole story connected",
     description:
-      "Coming soon. Open beta is free. Write chapters, keep a world bible, and draft in a dedicated script format.",
+      "Write chapters, keep a world bible, and draft in a dedicated script format. Free to start.",
     url: "/",
   },
 };

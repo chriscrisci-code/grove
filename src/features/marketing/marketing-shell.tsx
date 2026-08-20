@@ -2,22 +2,10 @@ import { BookOpen } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-export function MarketingShell({
-  children,
-  showBetaBanner = true,
-}: {
-  children: ReactNode;
-  showBetaBanner?: boolean;
-}) {
+export function MarketingShell({ children }: { children: ReactNode }) {
   return (
     <div className="marketing-shell">
       <div className="marketing-chrome">
-        {showBetaBanner ? (
-          <p className="marketing-beta-banner">
-            <span>Coming soon · Beta test for free</span>
-            <Link href="/sign-up">Sign up</Link>
-          </p>
-        ) : null}
         <header className="marketing-nav">
           <Link href="/" className="marketing-brand" aria-label="Grove home">
             <span className="brand-mark">
@@ -30,7 +18,7 @@ export function MarketingShell({
             <Link href="/pricing">Pricing</Link>
             <Link href="/sign-in">Sign in</Link>
             <Link href="/sign-up" className="marketing-nav-cta">
-              Join the beta
+              Sign up
             </Link>
           </nav>
         </header>

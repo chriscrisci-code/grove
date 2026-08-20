@@ -5,7 +5,7 @@ import { isStripeConfigured } from "@/lib/stripe";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Grove Free includes one story in open beta. Grove Plus adds unlimited stories, research, review, Ask AI, and manuscript PDF export.",
+    "Grove Free includes one story. Grove Plus adds unlimited stories, research, review, Ask AI, and manuscript PDF export.",
   alternates: { canonical: "/pricing" },
 };
 

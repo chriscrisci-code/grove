@@ -49,7 +49,7 @@ export default async function CheckoutPage({
   );
 
   return (
-    <MarketingShell showBetaBanner={false}>
+    <MarketingShell>
       <main className="billing-boundary-main">
         <section className="billing-boundary-card">
           <span className="billing-boundary-icon">

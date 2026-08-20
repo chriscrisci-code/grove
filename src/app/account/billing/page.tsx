@@ -9,6 +9,7 @@ import {
 } from "@/features/billing/billing-state";
 import { DeleteAccountButton } from "@/features/billing/delete-account-button";
 import { ManageBillingButton } from "@/features/billing/manage-billing-button";
+import { PlusGrantsPanel } from "@/features/billing/plus-grants-panel";
 import { isStripeConfigured } from "@/lib/stripe";
 
 export const metadata: Metadata = {
@@ -44,7 +45,9 @@ export default async function BillingPage() {
     ? subscribed
       ? "Preview access · Grove Plus"
       : "Preview access"
-    : billing.effectivePlan === "plus"
+    : billing.plusGrant
+      ? "Grove Plus · complimentary"
+      : billing.effectivePlan === "plus"
       ? "Grove Plus"
       : "Grove Free";
 
@@ -54,7 +57,9 @@ export default async function BillingPage() {
       : paymentsReady
         ? "You can subscribe now. Preview still leaves every feature open until Free limits are turned on."
         : "Billing keys are not on this environment yet, so every Grove feature remains available."
-    : billing.effectivePlan === "plus"
+    : billing.plusGrant
+      ? "Complimentary Grove Plus on this account. Every story is editable."
+      : billing.effectivePlan === "plus"
       ? "Every story is editable"
       : `Active Free Story: ${activeWorkspace?.name ?? "your most recently edited story"}`;
 
@@ -104,7 +109,7 @@ export default async function BillingPage() {
           </Link>
           {subscribed && billing.hasStripeCustomer ? (
             <ManageBillingButton />
-          ) : paymentsReady ? (
+          ) : billing.plusGrant ? null : paymentsReady ? (
             <Link href="/checkout?plan=plus" className="marketing-primary-cta">
               {billing.effectivePlan === "plus" && !subscribed
                 ? "Keep Plus when preview ends"
@@ -116,6 +121,7 @@ export default async function BillingPage() {
             </Link>
           )}
         </div>
+        {billing.canManagePlusGrants && <PlusGrantsPanel />}
         <div className="billing-danger-zone">
           <div>
             <strong>Delete account</strong>

@@ -9,6 +9,8 @@ export type SubscriptionStatus =
 export type BillingState = {
   effectivePlan: "free" | "plus";
   previewMode: boolean;
+  plusGrant: boolean;
+  canManagePlusGrants: boolean;
   subscriptionStatus: SubscriptionStatus;
   hasStripeCustomer: boolean;
   activeWorkspaceId: string | null;
@@ -29,6 +31,8 @@ const SUBSCRIPTION_STATUSES: SubscriptionStatus[] = [
 export const PREVIEW_BILLING_STATE: BillingState = {
   effectivePlan: "plus",
   previewMode: true,
+  plusGrant: false,
+  canManagePlusGrants: false,
   subscriptionStatus: "none",
   hasStripeCustomer: false,
   activeWorkspaceId: null,
@@ -57,6 +61,8 @@ export function normalizeBillingState(value: unknown): BillingState {
   return {
     effectivePlan: raw.effectivePlan === "free" ? "free" : "plus",
     previewMode: raw.previewMode !== false,
+    plusGrant: raw.plusGrant === true,
+    canManagePlusGrants: raw.canManagePlusGrants === true,
     subscriptionStatus: asSubscriptionStatus(raw.subscriptionStatus),
     hasStripeCustomer: raw.hasStripeCustomer === true,
     activeWorkspaceId:

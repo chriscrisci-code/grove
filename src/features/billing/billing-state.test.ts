@@ -26,6 +26,21 @@ describe("billing state", () => {
     });
   });
 
+  it("normalizes complimentary Plus grants", () => {
+    expect(
+      normalizeBillingState({
+        effectivePlan: "plus",
+        previewMode: false,
+        plusGrant: true,
+        canManagePlusGrants: true,
+      }),
+    ).toMatchObject({
+      plusGrant: true,
+      canManagePlusGrants: true,
+      previewMode: false,
+    });
+  });
+
   it("normalizes a free account and its active story", () => {
     expect(
       normalizeBillingState({

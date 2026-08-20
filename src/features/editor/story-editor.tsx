@@ -25,6 +25,7 @@ import {
   type ChapterEventInfo,
 } from "@/features/editor/chapter-event-node";
 import { eventIdsInChapterHtml } from "@/features/editor/chapter-events";
+import { watchChapterEventDragScroll } from "@/features/editor/chapter-event-scroll";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
 import {
   mergeDictationTranscript,
@@ -191,6 +192,11 @@ export function StoryEditor({
     if (editor.getHTML() === content) return;
     editor.commands.setContent(content, { emitUpdate: false });
   }, [content, editor]);
+
+  useEffect(() => {
+    if (!chapterEvents) return;
+    return watchChapterEventDragScroll();
+  }, [Boolean(chapterEvents)]);
 
   useEffect(() => {
     queueMicrotask(() =>

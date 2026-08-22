@@ -1,7 +1,12 @@
 "use client";
 
-import { Download, Share, Smartphone, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Download, Smartphone, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  detectInstallEnvironment,
+  installGuideFor,
+  type InstallGuide,
+} from "@/features/write/install-instructions";
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -16,23 +21,59 @@ function isStandaloneDisplay() {
   );
 }
 
-function isIosDevice() {
-  if (typeof navigator === "undefined") return false;
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+function InstallHelpDialog({
+  guide,
+  onClose,
+}: {
+  guide: InstallGuide;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="write-install-help"
+      role="dialog"
+      aria-labelledby="write-install-title"
+      onClick={onClose}
+    >
+      <div
+        className="write-install-help-card"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="write-install-close"
+          aria-label="Close install help"
+          onClick={onClose}
+        >
+          <X size={16} />
+        </button>
+        <h3 id="write-install-title">{guide.title}</h3>
+        <ol>
+          {guide.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
 }
 
 export function AddToHomeScreenButton() {
   const [installed, setInstalled] = useState(false);
-  const [ios, setIos] = useState(false);
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(
     null,
   );
-  const [showIosHelp, setShowIosHelp] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [guide, setGuide] = useState<InstallGuide | null>(null);
+  const environment = useMemo(
+    () =>
+      typeof navigator === "undefined"
+        ? { platform: "other" as const, browser: "other" as const }
+        : detectInstallEnvironment(navigator.userAgent),
+    [],
+  );
 
   useEffect(() => {
     setInstalled(isStandaloneDisplay());
-    setIos(isIosDevice());
 
     function onInstallPrompt(event: Event) {
       event.preventDefault();
@@ -42,6 +83,7 @@ export function AddToHomeScreenButton() {
     function onInstalled() {
       setInstalled(true);
       setPromptEvent(null);
+      setGuide(null);
     }
 
     window.addEventListener("beforeinstallprompt", onInstallPrompt);
@@ -59,21 +101,19 @@ export function AddToHomeScreenButton() {
       await promptEvent.prompt();
       const choice = await promptEvent.userChoice;
       setPromptEvent(null);
-      if (choice.outcome === "accepted") {
-        setNotice("Grove Write was added to your home screen.");
+      if (choice.outcome === "dismissed") {
+        setGuide(installGuideFor(environment));
       }
       return;
     }
 
-    if (ios) {
-      setShowIosHelp(true);
-      return;
-    }
-
-    setNotice(
-      "Use your browser menu to install Grove Write, or add this page to your home screen.",
-    );
+    setGuide(installGuideFor(environment));
   }
+
+  const buttonLabel =
+    environment.platform === "ios" || environment.platform === "android"
+      ? "Add Grove Write to home screen"
+      : "Install Grove Write on this device";
 
   return (
     <div className="write-install">
@@ -83,31 +123,9 @@ export function AddToHomeScreenButton() {
         onClick={() => void handleClick()}
       >
         {promptEvent ? <Download size={15} /> : <Smartphone size={15} />}
-        Add Grove Write to home screen
+        {buttonLabel}
       </button>
-      {notice && <p className="write-shell-notice">{notice}</p>}
-      {showIosHelp && (
-        <div className="write-install-help" role="dialog" aria-labelledby="write-install-title">
-          <div className="write-install-help-card">
-            <button
-              type="button"
-              className="write-install-close"
-              aria-label="Close install help"
-              onClick={() => setShowIosHelp(false)}
-            >
-              <X size={16} />
-            </button>
-            <h3 id="write-install-title">Add Grove Write on iPhone or iPad</h3>
-            <ol>
-              <li>
-                Tap <Share size={14} /> Share in Safari.
-              </li>
-              <li>Choose <strong>Add to Home Screen</strong>.</li>
-              <li>Open Grove Write from the new icon when you want to write offline.</li>
-            </ol>
-          </div>
-        </div>
-      )}
+      {guide && <InstallHelpDialog guide={guide} onClose={() => setGuide(null)} />}
     </div>
   );
 }

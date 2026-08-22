@@ -11,6 +11,7 @@ import {
 } from "@/features/write/offline-store";
 import { syncPendingCachedWorkspaces } from "@/features/write/offline-sync";
 import { RegisterWriteServiceWorker } from "@/features/write/register-write-sw";
+import { AddToHomeScreenButton } from "@/features/write/add-to-home-screen";
 
 export function WriteShell() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -106,6 +107,7 @@ export function WriteShell() {
             research, AI, collaboration, and billing.
           </p>
           <div className="write-shell-actions">
+            <AddToHomeScreenButton />
             <button
               type="button"
               className="marketing-primary-cta"

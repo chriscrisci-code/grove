@@ -104,6 +104,7 @@ type StoryEditorProps = {
   currentPageId: string;
   onFindLinks: (count: number) => void;
   readOnly?: boolean;
+  writeShell?: boolean;
   onSelectionChange?: (text: string) => void;
 };
 
@@ -123,6 +124,7 @@ export function StoryEditor({
   currentPageId,
   onFindLinks,
   readOnly = false,
+  writeShell = false,
   onSelectionChange,
 }: StoryEditorProps) {
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -393,6 +395,7 @@ export function StoryEditor({
     const currentEditor = editor;
     const dom = currentEditor.view.dom;
     function onContextMenu(event: MouseEvent) {
+      if (writeShell) return;
       const pos = currentEditor.view.posAtCoords({
         left: event.clientX,
         top: event.clientY,
@@ -415,10 +418,10 @@ export function StoryEditor({
     }
     dom.addEventListener("contextmenu", onContextMenu);
     return () => dom.removeEventListener("contextmenu", onContextMenu);
-  }, [editor]);
+  }, [editor, writeShell]);
 
   useEffect(() => {
-    if (!wordMenu) return;
+    if (!wordMenu || writeShell) return;
     const word = wordMenu.word;
     let cancelled = false;
     setWordLookupLoading(true);
@@ -436,11 +439,11 @@ export function StoryEditor({
     return () => {
       cancelled = true;
     };
-  }, [wordMenu]);
+  }, [wordMenu, writeShell]);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
-      if (!editor) return;
+      if (!editor || writeShell) return;
 
       const noModifiers =
         !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
@@ -526,6 +529,7 @@ export function StoryEditor({
     onOpenAi,
     openRelateCommand,
     openTagCommand,
+    writeShell,
   ]);
 
   const chapterEventValue = useMemo(
@@ -757,6 +761,8 @@ export function StoryEditor({
           </button>
         ))}
         <span className="toolbar-divider" aria-hidden="true" />
+        {!writeShell && (
+          <>
         <button
           type="button"
           className="page-create-button"
@@ -835,7 +841,9 @@ export function StoryEditor({
           {listening ? <MicOff size={16} /> : <Mic size={16} />}
           <span>{listening ? "Stop" : "Dictate"}</span>
         </button>
-        {tagTarget && (
+          </>
+        )}
+        {tagTarget && !writeShell && (
           <span className="tag-target-indicator" title="Current tag or relate target">
             Target: {tagTarget.title}
           </span>
@@ -872,7 +880,7 @@ export function StoryEditor({
           <EditorContent editor={editor} />
         </div>
       </ChapterEventContext.Provider>
-      {wordMenu && (
+      {wordMenu && !writeShell && (
         <WordMenu
           word={wordMenu.word}
           x={wordMenu.x}

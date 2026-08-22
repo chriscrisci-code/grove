@@ -162,6 +162,7 @@ export function ScriptEditor({
   onFindLinks,
   onRequestImport,
   readOnly = false,
+  writeShell = false,
   onSelectionChange,
 }: {
   content: string;
@@ -182,6 +183,7 @@ export function ScriptEditor({
   onFindLinks: (count: number) => void;
   onRequestImport: () => void;
   readOnly?: boolean;
+  writeShell?: boolean;
   onSelectionChange?: (text: string) => void;
 }) {
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -521,11 +523,13 @@ export function ScriptEditor({
       if (
         (event.key === "Enter" || event.key === " ") &&
         noMods &&
-        (openTagCommand(true) ||
-          openRelateCommand(true) ||
-          findExistingPageLinks(true) ||
-          createPageFromEditorText(true) ||
-          applySlashIfPresent())
+        (writeShell
+          ? applySlashIfPresent()
+          : openTagCommand(true) ||
+            openRelateCommand(true) ||
+            findExistingPageLinks(true) ||
+            createPageFromEditorText(true) ||
+            applySlashIfPresent())
       ) {
         event.preventDefault();
         return true;
@@ -543,6 +547,7 @@ export function ScriptEditor({
       }
 
       if (!event.altKey || event.ctrlKey || event.metaKey) return false;
+      if (writeShell) return false;
 
       if (event.key.toLowerCase() === "a") {
         event.preventDefault();
@@ -608,6 +613,7 @@ export function ScriptEditor({
       pickerOpen,
       readOnly,
       suggestions,
+      writeShell,
     ],
   );
 
@@ -825,6 +831,8 @@ export function ScriptEditor({
             </button>
           ))}
           <span className="toolbar-divider" aria-hidden="true" />
+          {!writeShell && (
+            <>
           <button
             type="button"
             className="page-create-button"
@@ -903,6 +911,8 @@ export function ScriptEditor({
             {listening ? <MicOff size={16} /> : <Mic size={16} />}
             <span>{listening ? "Stop" : "Dictate"}</span>
           </button>
+            </>
+          )}
           <span className="script-element-indicator">
             {SCRIPT_ELEMENT_TITLES[elementState].toUpperCase()}
           </span>

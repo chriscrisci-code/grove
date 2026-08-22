@@ -90,6 +90,12 @@ import {
   syncChapterEventMarkers,
 } from "@/features/editor/chapter-events";
 import { createClient } from "@/lib/supabase/client";
+import { CacheWorkspaceBridge } from "@/features/write/register-write-sw";
+import {
+  putCachedWorkspace,
+  workspaceCacheSnapshot,
+} from "@/features/write/offline-store";
+import { syncCachedWorkspacePages } from "@/features/write/offline-sync";
 import {
   RESEARCH_IMAGES_BUCKET,
   researchImagePathsForPages,
@@ -200,6 +206,18 @@ function makeId() {
   return crypto.randomUUID();
 }
 
+function isOwnEditLock(holderEmail?: string, userEmail?: string) {
+  if (!holderEmail || !userEmail) return false;
+  return holderEmail.trim().toLowerCase() === userEmail.trim().toLowerCase();
+}
+
+function editLockMessage(holderEmail?: string, userEmail?: string) {
+  if (isOwnEditLock(holderEmail, userEmail)) {
+    return "This story is already open in another Grove window.";
+  }
+  return `${holderEmail || "Another collaborator"} is editing this story. You can read and review until they leave.`;
+}
+
 type WorkspaceProps = {
   initialCloudPages?: StoryPage[];
   initialTags?: StoryTag[];
@@ -214,6 +232,8 @@ type WorkspaceProps = {
   readOnly?: boolean;
   workspaceRole?: "owner" | "editor" | "viewer";
   planAccess?: PlanAccess;
+  writeShell?: boolean;
+  writeShellOnline?: boolean;
 };
 
 export function Workspace({
@@ -230,13 +250,16 @@ export function Workspace({
   readOnly: serverReadOnly = false,
   workspaceRole,
   planAccess: serverPlanAccess,
+  writeShell = false,
+  writeShellOnline = true,
 }: WorkspaceProps = {}) {
   const router = useRouter();
   const cloudMode = Boolean(workspaceId && userId);
   const planAccess =
-    serverPlanAccess ?? getPlanAccess({ unlockPaid: !cloudMode });
+    serverPlanAccess ?? getPlanAccess({ unlockPaid: !cloudMode || writeShell });
   const shouldClaimEditLease =
     cloudMode &&
+    !writeShell &&
     !serverReadOnly &&
     (workspaceRole === "owner" || workspaceRole === "editor");
   const [editLease, setEditLease] = useState<{
@@ -494,6 +517,7 @@ export function Workspace({
       const result = data as {
         acquired?: boolean;
         holderEmail?: string;
+        leaseToken?: string;
       } | null;
       if (error || !result?.acquired) {
         setEditLease({
@@ -506,13 +530,17 @@ export function Workspace({
         return;
       }
 
+      if (result.leaseToken) {
+        editLeaseTokenRef.current = result.leaseToken;
+      }
       setEditLease({ status: "acquired" });
       renewalTimer = window.setInterval(async () => {
+        const heldToken = editLeaseTokenRef.current ?? leaseToken;
         const { data: renewed, error: renewError } = await supabase.rpc(
           "renew_workspace_edit_lease",
           {
             p_workspace_id: workspaceId,
-            p_lease_token: leaseToken,
+            p_lease_token: heldToken,
           },
         );
         if (active && (renewError || renewed !== true)) {
@@ -529,21 +557,52 @@ export function Workspace({
     void claimLease();
     return () => {
       active = false;
-      if (editLeaseTokenRef.current === leaseToken) {
-        editLeaseTokenRef.current = null;
-      }
+      const ownsLease = editLeaseTokenRef.current === leaseToken;
+      if (ownsLease) editLeaseTokenRef.current = null;
       if (renewalTimer !== null) window.clearInterval(renewalTimer);
       if (retryTimer !== null) window.clearTimeout(retryTimer);
-      void supabase.rpc("release_workspace_edit_lease", {
-        p_workspace_id: workspaceId,
-        p_lease_token: leaseToken,
-      });
+      if (ownsLease) {
+        void supabase.rpc("release_workspace_edit_lease", {
+          p_workspace_id: workspaceId,
+          p_lease_token: leaseToken,
+        });
+      }
     };
   }, [shouldClaimEditLease, workspaceId]);
 
   useEffect(() => {
     if (readOnly) return;
     const timer = window.setTimeout(async () => {
+      const livePages = pages.filter((page) => !deletingIds.current.has(page.id));
+      if (writeShell && workspaceId && userId) {
+        await putCachedWorkspace(
+          workspaceCacheSnapshot({
+            id: workspaceId,
+            name: workspaceName,
+            userId,
+            pages: livePages,
+            pendingSync: true,
+          }),
+        );
+        if (writeShellOnline) {
+          const result = await syncCachedWorkspacePages({
+            supabase: createClient(),
+            workspaceId,
+            userId,
+            workspaceName,
+            pages: livePages,
+          });
+          if (!result.ok && result.reason !== "offline") {
+            setNotice(
+              result.message ||
+                "Saved on this device. Sync to Grove will retry when editing is free.",
+            );
+            window.setTimeout(() => setNotice(""), 3200);
+          }
+        }
+        setSavedAt(Date.now());
+        return;
+      }
       if (cloudMode && workspaceId && userId) {
         const supabase = createClient();
         const leaseToken = editLeaseTokenRef.current;
@@ -551,22 +610,29 @@ export function Workspace({
         const { error } = await supabase.rpc("save_workspace_pages", {
           p_workspace_id: workspaceId,
           p_lease_token: leaseToken,
-          p_pages: pages
-            .filter((page) => !deletingIds.current.has(page.id))
-            .map((page, position) => ({
-              id: page.id,
-              parent_id: page.parentId,
-              title: page.title || "Untitled",
-              content: { html: page.content, unvisited: page.unvisited },
-              page_type: page.pageType,
-              fields: page.fields,
-              position,
-            })),
+          p_pages: livePages.map((page, position) => ({
+            id: page.id,
+            parent_id: page.parentId,
+            title: page.title || "Untitled",
+            content: { html: page.content, unvisited: page.unvisited },
+            page_type: page.pageType,
+            fields: page.fields,
+            position,
+          })),
         });
         if (error) {
           setNotice("Cloud save failed. Your text is still on screen.");
           return;
         }
+        await putCachedWorkspace(
+          workspaceCacheSnapshot({
+            id: workspaceId,
+            name: workspaceName,
+            userId,
+            pages: livePages,
+            pendingSync: false,
+          }),
+        );
       } else {
         localStorage.setItem("storytree-pages", JSON.stringify(pages));
         localStorage.setItem("storytree-active-page", activeId);
@@ -574,20 +640,30 @@ export function Workspace({
       setSavedAt(Date.now());
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [pages, activeId, cloudMode, readOnly, userId, workspaceId]);
+  }, [
+    pages,
+    activeId,
+    cloudMode,
+    readOnly,
+    userId,
+    workspaceId,
+    workspaceName,
+    writeShell,
+    writeShellOnline,
+  ]);
 
   useEffect(() => {
-    if (cloudMode) return;
+    if (cloudMode || writeShell) return;
     localStorage.setItem("storytree-tags", JSON.stringify(tags));
     localStorage.setItem("storytree-page-tags", JSON.stringify(pageTags));
     localStorage.setItem(
       "storytree-relationships",
       JSON.stringify(relationships),
     );
-  }, [cloudMode, pageTags, relationships, tags]);
+  }, [cloudMode, pageTags, relationships, tags, writeShell]);
 
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || writeShell) return;
     const timer = window.setTimeout(async () => {
       if (cloudMode && workspaceId) {
         const { error } = await createClient()
@@ -604,7 +680,7 @@ export function Workspace({
       }
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [cloudMode, geography, readOnly, workspaceId]);
+  }, [cloudMode, geography, readOnly, workspaceId, writeShell]);
 
   const denyPlan = useCallback((feature: FeatureName) => {
     setNotice(planLimitMessage(feature));
@@ -614,7 +690,9 @@ export function Workspace({
   const blockReadOnly = useCallback(() => {
     setNotice(
       editLease.status === "blocked"
-        ? `${editLease.holderEmail || "Another collaborator"} is editing this story right now.`
+        ? isOwnEditLock(editLease.holderEmail, userEmail)
+          ? "This story is already open in another Grove window."
+          : `${editLease.holderEmail || "Another collaborator"} is editing this story right now.`
         : workspaceRole === "viewer"
         ? "Reviewers can comment and suggest, but cannot change the story."
         : workspaceRole === "editor"
@@ -622,7 +700,7 @@ export function Workspace({
           : "This story is read-only. Make it your Active Free Story to edit it.",
     );
     window.setTimeout(() => setNotice(""), 2800);
-  }, [editLease, workspaceRole]);
+  }, [editLease, userEmail, workspaceRole]);
 
   const openAi = useCallback(
     (selectedText = "") => {
@@ -2216,7 +2294,7 @@ export function Workspace({
             )}
           </section>
 
-          {tagsOpen && (
+          {tagsOpen && !writeShell && (
             <div
               className="tag-panel-resizer"
               role="separator"
@@ -2254,6 +2332,7 @@ export function Workspace({
               }}
             />
           )}
+          {!writeShell && (
           <section
             className={`sidebar-tags ${tagsOpen ? "open" : "collapsed"}`}
             style={tagsOpen ? { height: tagPanelHeight } : undefined}
@@ -2348,6 +2427,7 @@ export function Workspace({
               </div>
             )}
           </section>
+          )}
 
           <div className="sidebar-footer">
             <button
@@ -2453,7 +2533,7 @@ export function Workspace({
             <button
               type="button"
               className="dashboard-return"
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push(writeShell ? "/write" : "/dashboard")}
             >
               <ArrowLeft size={14} />
               <span>Projects</span>
@@ -2484,10 +2564,16 @@ export function Workspace({
           <div className="topbar-actions">
             {!researchOpen && !relationshipsOpen && (
               <span className="save-state">
-                {savedAt ? "Saved" : "Saving…"}
+                {writeShell && !writeShellOnline
+                  ? savedAt
+                    ? "Saved on device"
+                    : "Saving on device…"
+                  : savedAt
+                    ? "Saved"
+                    : "Saving…"}
               </span>
             )}
-            {!relationshipsOpen && (
+            {!writeShell && !researchOpen && !relationshipsOpen && (
               <button
                 type="button"
                 className={`research-button ${researchOpen ? "active" : ""}`}
@@ -2507,7 +2593,7 @@ export function Workspace({
                 <span>{researchOpen ? "Writing" : "Research"}</span>
               </button>
             )}
-            {!researchOpen && (
+            {!writeShell && !researchOpen && (
               <button
                 type="button"
                 className={`research-button ${relationshipsOpen ? "active" : ""}`}
@@ -2527,7 +2613,7 @@ export function Workspace({
                 <span>{relationshipsOpen ? "Writing" : "Relationships"}</span>
               </button>
             )}
-            {!researchOpen && !relationshipsOpen && (
+            {!writeShell && !researchOpen && !relationshipsOpen && (
               <button
                 type="button"
                 className="ai-button"
@@ -2538,7 +2624,7 @@ export function Workspace({
                 <kbd>Alt A</kbd>
               </button>
             )}
-            {canComment && !researchOpen && !relationshipsOpen && (
+            {!writeShell && canComment && !researchOpen && !relationshipsOpen && (
               <button
                 type="button"
                 className={`research-button ${reviewOpen ? "active" : ""}`}
@@ -2552,7 +2638,7 @@ export function Workspace({
                 <span>Review</span>
               </button>
             )}
-            {isOwner && workspaceId && (
+            {!writeShell && isOwner && workspaceId && (
               <button
                 type="button"
                 className="help-button"
@@ -2580,7 +2666,7 @@ export function Workspace({
             <LockKeyhole size={14} />
             <span>
               {editLease.status === "blocked"
-                ? `${editLease.holderEmail || "Another collaborator"} is editing this story. You can read and review until they leave.`
+                ? editLockMessage(editLease.holderEmail, userEmail)
                 : workspaceRole === "viewer"
                 ? "You are a Reviewer. You can read, select and copy text, and leave comments or suggestions."
                 : workspaceRole === "editor"
@@ -2745,7 +2831,7 @@ export function Workspace({
                 })}
               </div>
             )}
-            {activeRelations.length > 0 && (
+            {activeRelations.length > 0 && !writeShell && (
               <div className="related-chip-list" aria-label="Related pages">
                 {activeRelations.map((item) => {
                   const otherId =
@@ -2789,6 +2875,7 @@ export function Workspace({
                 content={htmlToScriptHtml(activePage.content)}
                 onChange={(content) => updateActivePage({ content })}
                 readOnly={readOnly}
+                writeShell={writeShell}
                 onSelectionChange={(text) =>
                   setReviewSelection({ pageId: activePage.id, text })
                 }
@@ -2847,6 +2934,7 @@ export function Workspace({
               content={activePage.content}
               onChange={(content) => updateActivePage({ content })}
               readOnly={readOnly}
+              writeShell={writeShell}
               onSelectionChange={(text) =>
                 setReviewSelection({ pageId: activePage.id, text })
               }
@@ -3062,7 +3150,7 @@ export function Workspace({
         </div>
       )}
 
-      {tagPickerPage && (
+      {tagPickerPage && !writeShell && (
         <TagPicker
           page={tagPickerPage}
           tags={tags}
@@ -3121,6 +3209,15 @@ export function Workspace({
       )}
 
       {notice && <div className="notice">{notice}</div>}
+      {cloudMode && !writeShell && workspaceId && userId && (
+        <CacheWorkspaceBridge
+          enabled
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          userId={userId}
+          pages={pages}
+        />
+      )}
     </main>
   );
 }

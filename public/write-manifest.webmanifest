@@ -1,0 +1,17 @@
+{
+  "name": "Grove Write",
+  "short_name": "Grove Write",
+  "description": "Write and organize Grove stories offline.",
+  "start_url": "/write",
+  "scope": "/write/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#2f4a37",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

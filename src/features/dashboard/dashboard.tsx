@@ -223,6 +223,9 @@ export function Dashboard({
           Grove
         </Link>
         <div className="dashboard-user">
+          <Link href="/write" className="secondary-button">
+            Grove Write
+          </Link>
           <span>{userEmail}</span>
           <Link
             href="/account/billing"

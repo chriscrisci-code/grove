@@ -10,8 +10,15 @@ import {
   type CachedWorkspace,
 } from "@/features/write/offline-store";
 import { syncPendingCachedWorkspaces } from "@/features/write/offline-sync";
-import { RegisterWriteServiceWorker } from "@/features/write/register-write-sw";
+import {
+  precacheWriteShellAssets,
+  RegisterWriteServiceWorker,
+} from "@/features/write/register-write-sw";
 import { AddToHomeScreenButton } from "@/features/write/add-to-home-screen";
+import {
+  readLastWriteWorkspace,
+  resolveWriteSession,
+} from "@/features/write/write-session";
 
 export function WriteShell() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -21,6 +28,10 @@ export function WriteShell() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [bootError, setBootError] = useState("");
+  const [continueWorkspaceId, setContinueWorkspaceId] = useState<string | null>(
+    null,
+  );
 
   async function loadStories(activeUserId: string) {
     setStories(await listCachedWorkspaces(activeUserId));
@@ -34,38 +45,53 @@ export function WriteShell() {
     let active = true;
     async function boot() {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const sessionResult = await resolveWriteSession(supabase);
       if (!active) return;
-      if (!user) {
+
+      if (sessionResult.status === "needs-sign-in") {
         window.location.replace(
           `/sign-in?next=${encodeURIComponent("/write")}`,
         );
         return;
       }
-      setUserId(user.id);
-      setUserEmail(user.email ?? null);
-      await refreshReachability();
-      await loadStories(user.id);
-      if (await checkGroveReachable()) {
-        setSyncing(true);
-        const results = await syncPendingCachedWorkspaces({
-          supabase,
-          userId: user.id,
-        });
-        const failed = results.filter((item) => !item.result.ok);
-        if (failed.length > 0) {
-          setNotice(
-            failed.length === 1
-              ? "One story still needs to sync when editing is free."
-              : `${failed.length} stories still need to sync when editing is free.`,
-          );
-        }
-        await loadStories(user.id);
-        setSyncing(false);
+
+      if (sessionResult.status === "offline-no-session") {
+        setBootError(
+          "Sign in to Grove Write once while online. After that, your stories stay on this device for offline writing.",
+        );
+        setLoading(false);
+        return;
       }
+
+      const session = sessionResult.session;
+      setUserId(session.userId);
+      setUserEmail(session.email);
+      setContinueWorkspaceId(readLastWriteWorkspace());
+      await loadStories(session.userId);
       setLoading(false);
+
+      const reachable = await checkGroveReachable();
+      if (!active) return;
+      setOnline(reachable);
+      precacheWriteShellAssets();
+
+      if (!reachable) return;
+
+      setSyncing(true);
+      const results = await syncPendingCachedWorkspaces({
+        supabase,
+        userId: session.userId,
+      });
+      const failed = results.filter((item) => !item.result.ok);
+      if (failed.length > 0) {
+        setNotice(
+          failed.length === 1
+            ? "One story still needs to sync when editing is free."
+            : `${failed.length} stories still need to sync when editing is free.`,
+        );
+      }
+      await loadStories(session.userId);
+      setSyncing(false);
     }
     void boot();
     const onOnline = () => void refreshReachability();
@@ -78,6 +104,22 @@ export function WriteShell() {
       window.removeEventListener("offline", onOffline);
     };
   }, []);
+
+  if (bootError) {
+    return (
+      <>
+        <RegisterWriteServiceWorker />
+        <main className="write-shell write-shell-loading">
+          <h1>Grove Write</h1>
+          <p>{bootError}</p>
+        </main>
+      </>
+    );
+  }
+
+  const continueStory = continueWorkspaceId
+    ? stories.find((story) => story.id === continueWorkspaceId)
+    : null;
 
   return (
     <>
@@ -112,6 +154,7 @@ export function WriteShell() {
               type="button"
               className="marketing-primary-cta"
               onClick={() => openFullGrove("/dashboard")}
+              disabled={!online}
             >
               <ExternalLink size={15} />
               Open full Grove
@@ -121,6 +164,22 @@ export function WriteShell() {
             </Link>
           </div>
         </section>
+
+        {continueStory && (
+          <section className="write-shell-card">
+            <div className="write-shell-list-heading">
+              <h2>Continue writing</h2>
+            </div>
+            <Link href={`/write/${continueStory.id}`} className="write-shell-story">
+              <strong>{continueStory.name}</strong>
+              <span>
+                {continueStory.pendingSync
+                  ? "Waiting to sync"
+                  : `Cached ${new Date(continueStory.cachedAt).toLocaleString()}`}
+              </span>
+            </Link>
+          </section>
+        )}
 
         <section className="write-shell-card">
           <div className="write-shell-list-heading">

@@ -1,16 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Workspace, type StoryPage } from "@/features/workspace/workspace";
 import { createClient } from "@/lib/supabase/client";
 import { checkGroveReachable, openFullGrove } from "@/features/write/connectivity";
-import {
-  getCachedWorkspace,
-} from "@/features/write/offline-store";
+import { getCachedWorkspace } from "@/features/write/offline-store";
 import { refreshWorkspaceCacheFromCloud } from "@/features/write/offline-sync";
-import { RegisterWriteServiceWorker } from "@/features/write/register-write-sw";
+import {
+  precacheWriteShellAssets,
+  RegisterWriteServiceWorker,
+} from "@/features/write/register-write-sw";
 import { planAccessFromBilling } from "@/features/billing/plan";
 import { normalizeBillingState } from "@/features/billing/billing-state";
+import {
+  persistLastWriteWorkspace,
+  resolveWriteSession,
+} from "@/features/write/write-session";
 
 type WriteWorkspaceLoaderProps = {
   workspaceId: string;
@@ -32,15 +38,28 @@ export function WriteWorkspaceLoader({ workspaceId }: WriteWorkspaceLoaderProps)
     let active = true;
     async function load() {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+      const sessionResult = await resolveWriteSession(supabase);
+      if (!active) return;
+
+      if (sessionResult.status === "needs-sign-in") {
         window.location.replace(
           `/sign-in?next=${encodeURIComponent(`/write/${workspaceId}`)}`,
         );
         return;
       }
+
+      if (sessionResult.status === "offline-no-session") {
+        setError(
+          "Sign in to Grove Write once while online. After that, cached stories open offline from this device.",
+        );
+        setReady(true);
+        return;
+      }
+
+      const session = sessionResult.session;
+      persistLastWriteWorkspace(workspaceId);
+      precacheWriteShellAssets();
+
       const reachable = await checkGroveReachable();
       if (!active) return;
       setOnline(reachable);
@@ -51,11 +70,11 @@ export function WriteWorkspaceLoader({ workspaceId }: WriteWorkspaceLoaderProps)
         setPlanAccess(
           planAccessFromBilling(normalizeBillingState(rawBilling).effectivePlan),
         );
-        if (!snapshot || snapshot.userId !== user.id) {
+        if (!snapshot || snapshot.userId !== session.userId) {
           const refreshed = await refreshWorkspaceCacheFromCloud({
             supabase,
             workspaceId,
-            userId: user.id,
+            userId: session.userId,
           });
           if (!refreshed) {
             setError("This story was not found in your Grove account.");
@@ -67,23 +86,23 @@ export function WriteWorkspaceLoader({ workspaceId }: WriteWorkspaceLoaderProps)
           void refreshWorkspaceCacheFromCloud({
             supabase,
             workspaceId,
-            userId: user.id,
+            userId: session.userId,
           }).then((refreshed) => {
             if (!active || !refreshed) return;
             setPages(refreshed.pages);
             setWorkspaceName(refreshed.name);
           });
         }
-      } else if (!snapshot || snapshot.userId !== user.id) {
+      } else if (!snapshot || snapshot.userId !== session.userId) {
         setError(
-          "This story is not on this device yet. Open it once in full Grove while online.",
+          "This story is not on this device yet. Open it once in Grove Write or full Grove while online.",
         );
         setReady(true);
         return;
       }
 
-      setUserId(user.id);
-      setUserEmail(user.email ?? undefined);
+      setUserId(session.userId);
+      setUserEmail(session.email ?? undefined);
       setPages(snapshot.pages);
       setWorkspaceName(snapshot.name);
       setReady(true);
@@ -113,13 +132,20 @@ export function WriteWorkspaceLoader({ workspaceId }: WriteWorkspaceLoaderProps)
       <main className="write-shell write-shell-loading">
         <RegisterWriteServiceWorker />
         <p>{error}</p>
-        <button
-          type="button"
-          className="marketing-primary-cta"
-          onClick={() => openFullGrove("/dashboard")}
-        >
-          Open full Grove
-        </button>
+        {!online && (
+          <Link href="/write" className="secondary-button">
+            Back to stories on this device
+          </Link>
+        )}
+        {online && (
+          <button
+            type="button"
+            className="marketing-primary-cta"
+            onClick={() => openFullGrove("/dashboard")}
+          >
+            Open full Grove
+          </button>
+        )}
       </main>
     );
   }
@@ -133,9 +159,11 @@ export function WriteWorkspaceLoader({ workspaceId }: WriteWorkspaceLoaderProps)
             ? "Grove Write — changes save here and sync to Grove when they can."
             : "Offline — writing and page order stay on this device until Grove is back."}
         </span>
-        <button type="button" onClick={() => openFullGrove(`/workspace/${workspaceId}`)}>
-          Open in browser
-        </button>
+        {online && (
+          <button type="button" onClick={() => openFullGrove(`/workspace/${workspaceId}`)}>
+            Open in browser
+          </button>
+        )}
       </div>
       <Workspace
         initialCloudPages={pages}

@@ -317,7 +317,11 @@ export function RelationshipTimeline({
 
   return (
     <div className="relationship-timeline">
-      <aside ref={trayRef} className="timeline-tray" aria-label="Unused chapters and events">
+      <aside
+        ref={trayRef}
+        className="timeline-tray"
+        aria-label="Unused chapters, events, and script events"
+      >
         <span className="eyebrow">NOT ON THE TIMELINE</span>
         {tray.length ? (
           <ul>

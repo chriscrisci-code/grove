@@ -1,4 +1,5 @@
 import { CHAPTER_EVENT_TYPE } from "./chapter-events";
+import { SCRIPT_EVENT_TYPE } from "./script-events";
 
 export const DRAG_SCROLL_EDGE = 160;
 export const DRAG_SCROLL_MAX_SPEED = 32;
@@ -66,7 +67,13 @@ export function watchChapterEventDragScroll() {
   const onDragStart = (event: DragEvent) => {
     const origin = event.target;
     if (!(origin instanceof Element)) return;
-    if (!origin.closest(`[data-type="${CHAPTER_EVENT_TYPE}"]`)) return;
+    if (
+      !origin.closest(
+        `[data-type="${CHAPTER_EVENT_TYPE}"], [data-type="${SCRIPT_EVENT_TYPE}"]`,
+      )
+    ) {
+      return;
+    }
 
     const found =
       origin.closest(".document-pane") ?? closestVerticalScroller(origin);

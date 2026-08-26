@@ -1,10 +1,19 @@
 export const CHANGELOG = [
   {
+    date: "August 26, 2026",
+    items: [
+      "Script event is a new page type that nests under Scripts the way Events nest under Chapters, with movable blocks in the script and expansion in the screenplay PDF.",
+      "Script event pages use script format, and they can be placed on the Timeline with Chapters and Events.",
+    ],
+  },
+  {
     date: "August 20, 2026",
     items: [
       "Research on each page accepts dropped JPEG, PNG, and WebP images alongside saved links.",
       "Events nested under a Chapter appear in the Chapters list and as movable blocks in the chapter.",
       "Nested pages in Your story can be moved back to the top with an un-nest control.",
+      "Opening a story in a second Grove window no longer locks you out of your own editing.",
+      "Complimentary Grove Plus can be given to a few friends from Account & billing.",
     ],
   },
   {

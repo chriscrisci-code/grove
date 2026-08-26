@@ -90,6 +90,33 @@ describe("page tree drops", () => {
     ).toBe("ch1");
   });
 
+  it("nests only script events inside a script", () => {
+    const withScript = [
+      ...pages,
+      { id: "sc1", parentId: null, title: "One", pageType: "script" },
+      { id: "beat", parentId: null, title: "Beat", pageType: "script_event" },
+      { id: "storm", parentId: null, title: "Storm", pageType: "event" },
+    ];
+    expect(
+      applyPageDrop(withScript, "mara", {
+        type: "inside",
+        targetId: "sc1",
+      }),
+    ).toBeNull();
+    expect(
+      applyPageDrop(withScript, "storm", {
+        type: "inside",
+        targetId: "sc1",
+      }),
+    ).toBeNull();
+    expect(
+      applyPageDrop(withScript, "beat", {
+        type: "inside",
+        targetId: "sc1",
+      })?.find((page) => page.id === "beat")?.parentId,
+    ).toBe("sc1");
+  });
+
   it("knows descendant relationships", () => {
     expect(isDescendantOf(pages, "characters", "mara")).toBe(true);
     expect(isDescendantOf(pages, "mara", "characters")).toBe(false);

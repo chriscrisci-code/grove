@@ -115,8 +115,9 @@ export function applyPageDrop<T extends TreePage>(
     if (!target || draggedId === drop.targetId) return null;
     if (isDescendantOf(pages, draggedId, drop.targetId)) return null;
     if (dragged.parentId === target.id) return null;
-    if (target.pageType === "script") return null;
-    if (target.pageType === "chapter" && dragged.pageType !== "event") {
+    if (target.pageType === "script") {
+      if (dragged.pageType !== "script_event") return null;
+    } else if (target.pageType === "chapter" && dragged.pageType !== "event") {
       return null;
     }
     newParentId = target.id;
@@ -187,6 +188,7 @@ export function applyPageTypeChange<
     }
     if (enteringList && page.parentId === pageId) {
       if (pageType === "chapter" && page.pageType === "event") return page;
+      if (pageType === "script" && page.pageType === "script_event") return page;
       return { ...page, parentId: null };
     }
     return page;

@@ -52,6 +52,11 @@ const pages: {
     pageType: "character",
     fields: {},
   },
+  {
+    id: "beat",
+    pageType: "script_event",
+    fields: { timelineY: "80" },
+  },
 ];
 
 describe("timeline helpers", () => {
@@ -66,7 +71,7 @@ describe("timeline helpers", () => {
   it("splits unused chapters and events from placed ones", () => {
     const { tray, placed } = splitTimelinePages(pages);
     expect(tray.map((page) => page.id)).toEqual(["one"]);
-    expect(placed.map((page) => page.id)).toEqual(["two", "storm"]);
+    expect(placed.map((page) => page.id)).toEqual(["two", "beat", "storm"]);
     expect(placed[0]?.timelineY).toBe(12);
     expect(placed[0]?.timelineLane).toBe(0);
   });

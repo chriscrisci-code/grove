@@ -60,11 +60,15 @@ const SECTIONS = [
     items: [
       {
         keys: ["Type"],
-        text: "Set a page to Script, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events live in Your story, or nested under a Chapter. Scripts live in the Scripts list, like Chapters.",
+        text: "Set a page to Script, Script event, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events nest under a Chapter; Script events nest under a Script. Scripts live in the Scripts list, like Chapters.",
       },
       {
         keys: ["Chapters"],
         text: "Chapter pages live only in the Chapters list. Drag order is manuscript order. Nested Events appear under their chapter and as movable blocks in the chapter text. The printer icon prints chapters to PDF.",
+      },
+      {
+        keys: ["Scripts"],
+        text: "Script pages live in the Scripts list. Nested Script events appear under their script and as movable blocks in the script text. Script event pages use script format. The printer icon expands those blocks into the screenplay PDF.",
       },
     ],
   },
@@ -123,7 +127,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["+"],
-        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. The plus beside Chapters or Scripts adds to that list. The plus on a Chapter row nests an Event in that chapter. Pages list A to Z, with subpages under their parent. Drag onto a title to nest. Nested pages have an un-nest control, and you can also drag onto Your story. Filter by page type.",
+        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. The plus beside Chapters or Scripts adds to that list. The plus on a Chapter row nests an Event; the plus on a Script row nests a Script event. Pages list A to Z, with subpages under their parent. Drag onto a title to nest. Nested pages have an un-nest control, and you can also drag onto Your story. Filter by page type.",
       },
       {
         keys: ["Research"],
@@ -131,7 +135,7 @@ const SECTIONS = [
       },
       {
         keys: ["Relationships"],
-        text: "Timeline orders Chapters and Events. Web shows every named connection. Family builds a typed character tree.",
+        text: "Timeline orders Chapters, Events, and Script events. Web shows every named connection. Family builds a typed character tree.",
       },
       {
         keys: ["Review"],

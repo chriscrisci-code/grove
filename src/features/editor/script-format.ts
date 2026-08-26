@@ -493,6 +493,7 @@ export function proseToScriptHtml(html: string) {
 
 export function isScriptHtmlEmpty(html: string | undefined) {
   if (!html) return true;
+  if (/data-type=["']script-event["']/i.test(html)) return false;
   const text = decodeHtml(stripTags(html)).replace(/\u00a0/g, " ").trim();
   return text.length === 0;
 }
@@ -500,7 +501,7 @@ export function isScriptHtmlEmpty(html: string | undefined) {
 export function htmlToScriptHtml(html: string) {
   if (isScriptHtmlEmpty(html)) return '<p data-script="action"></p>';
   if (/data-script\s*=/i.test(html)) return html;
-  return html.replace(/<p\b/gi, '<p data-script="action"');
+  return html.replace(/<p\b(?![^>]*data-script)/gi, '<p data-script="action"');
 }
 
 export function mergeScriptHtml(existing: string, incoming: string) {

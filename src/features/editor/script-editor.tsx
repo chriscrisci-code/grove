@@ -23,6 +23,13 @@ import {
   mergeDictationTranscript,
   shouldKeepDictationAlive,
 } from "@/features/editor/dictation";
+import { watchChapterEventDragScroll } from "@/features/editor/chapter-event-scroll";
+import {
+  ScriptEvent,
+  ScriptEventContext,
+  type ScriptEventInfo,
+} from "@/features/editor/script-event-node";
+import { eventIdsInScriptHtml } from "@/features/editor/script-events";
 import {
   SCRIPT_ELEMENTS,
   SCRIPT_ELEMENT_LABELS,
@@ -233,6 +240,8 @@ export function ScriptEditor({
   currentPageId,
   onFindLinks,
   onRequestImport,
+  scriptEvents,
+  onEventMarkersChange,
   readOnly = false,
   writeShell = false,
   onSelectionChange,
@@ -254,6 +263,8 @@ export function ScriptEditor({
   currentPageId: string;
   onFindLinks: (count: number) => void;
   onRequestImport: () => void;
+  scriptEvents?: ScriptEventInfo[];
+  onEventMarkersChange?: (eventIds: string[]) => void;
   readOnly?: boolean;
   writeShell?: boolean;
   onSelectionChange?: (text: string) => void;
@@ -307,6 +318,7 @@ export function ScriptEditor({
           return "Action…  Tab for a character, /int for a scene";
         },
       }),
+      ...(scriptEvents ? [ScriptEvent] : []),
     ],
     content,
     editable: !readOnly,
@@ -320,11 +332,14 @@ export function ScriptEditor({
     },
     onUpdate: ({ editor: currentEditor }) => {
       if (readOnly) return;
+      const html = currentEditor.getHTML();
       if (autofillGuardRef.current) {
-        onChange(currentEditor.getHTML());
+        onChange(html);
+        onEventMarkersChange?.(eventIdsInScriptHtml(html));
         return;
       }
-      onChange(currentEditor.getHTML());
+      onChange(html);
+      onEventMarkersChange?.(eventIdsInScriptHtml(html));
       if (currentElement(currentEditor) !== "character") return;
       autofillGuardRef.current = true;
       try {
@@ -355,6 +370,11 @@ export function ScriptEditor({
   }, [editor, readOnly]);
 
   useEffect(() => {
+    if (!scriptEvents) return;
+    return watchChapterEventDragScroll();
+  }, [Boolean(scriptEvents)]);
+
+  useEffect(() => {
     queueMicrotask(() => setSpeechSupported(Boolean(speechRecognitionEngine())));
     return () => {
       listeningIntentRef.current = false;
@@ -364,6 +384,14 @@ export function ScriptEditor({
       recognitionRef.current?.abort();
     };
   }, []);
+
+  const scriptEventValue = useMemo(
+    () => ({
+      events: scriptEvents ?? [],
+      onOpenEvent: onNavigatePage,
+    }),
+    [scriptEvents, onNavigatePage],
+  );
 
   const elementState = normalizeScriptElement(
     useEditorState({
@@ -1153,6 +1181,7 @@ export function ScriptEditor({
           </div>
         </div>
       )}
+      <ScriptEventContext.Provider value={scriptEventValue}>
       <div
         className={[
           showEmptyStart ? "script-editor-host dimmed" : "script-editor-host",
@@ -1173,6 +1202,7 @@ export function ScriptEditor({
       >
         <EditorContent editor={editor} />
       </div>
+      </ScriptEventContext.Provider>
     </div>
   );
 }

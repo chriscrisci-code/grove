@@ -139,6 +139,12 @@ describe("character suggestions", () => {
 });
 
 describe("chapter import", () => {
+  it("keeps script-event markers when normalizing empty-looking HTML", () => {
+    const marker =
+      '<div data-type="script-event" data-event-id="beat-1"></div>';
+    expect(isScriptHtmlEmpty(marker)).toBe(false);
+    expect(htmlToScriptHtml(marker)).toBe(marker);
+  });
   it("turns attributed quotes into character and dialogue", () => {
     expect(
       proseParagraphsToScriptLines([

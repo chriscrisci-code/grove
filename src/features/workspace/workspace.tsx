@@ -89,6 +89,14 @@ import {
   removeChapterEventMarker,
   syncChapterEventMarkers,
 } from "@/features/editor/chapter-events";
+import {
+  expandScriptEventMarkers,
+  insertScriptEventMarker,
+  isScriptNestedEvent,
+  removeScriptEventMarker,
+  scriptEventChildren,
+  syncScriptEventMarkers,
+} from "@/features/editor/script-events";
 import { createClient } from "@/lib/supabase/client";
 import { CacheWorkspaceBridge } from "@/features/write/register-write-sw";
 import {
@@ -751,7 +759,10 @@ export function Workspace({
       filterStoryPages(
         pages.filter((page) => {
           if (isSidebarListType(page.pageType)) return false;
-          return !isChapterNestedEvent(pages, page);
+          return (
+            !isChapterNestedEvent(pages, page) &&
+            !isScriptNestedEvent(pages, page)
+          );
         }),
         { types: storyTypeFilter, query: search },
       ),
@@ -791,9 +802,14 @@ export function Workspace({
   const scriptPages = useMemo(() => {
     const scripts = pages.filter((page) => page.pageType === "script");
     const query = search.trim().toLowerCase();
-    return query
-      ? scripts.filter((page) => page.title.toLowerCase().includes(query))
-      : scripts;
+    if (!query) return scripts;
+    return scripts.filter(
+      (script) =>
+        script.title.toLowerCase().includes(query) ||
+        scriptEventChildren(pages, script.id).some((event) =>
+          event.title.toLowerCase().includes(query),
+        ),
+    );
   }, [pages, search]);
   const activeRelations = useMemo(
     () =>
@@ -849,21 +865,39 @@ export function Workspace({
             );
           }
         }
+        if (parentId && pageType === "script_event") {
+          const parent = next.find((candidate) => candidate.id === parentId);
+          if (parent?.pageType === "script") {
+            next = next.map((candidate) =>
+              candidate.id === parentId
+                ? {
+                    ...candidate,
+                    content: insertScriptEventMarker(
+                      candidate.content,
+                      page.id,
+                    ),
+                    updatedAt: Date.now(),
+                  }
+                : candidate,
+            );
+          }
+        }
         return next;
       });
       if (pageType === "chapter" || (parentId && pageType === "event")) {
         setChaptersOpen(true);
       }
-      if (pageType === "script") setScriptsOpen(true);
+      if (pageType === "script" || (parentId && pageType === "script_event")) {
+        setScriptsOpen(true);
+      }
       if (parentId) {
         setExpanded((current) => new Set(current).add(parentId));
       }
       if (activate) setActiveId(page.id);
       if (
         parentId &&
-        pageType === "event" &&
-        parentId === activeId &&
-        !activate
+        ((pageType === "event" && parentId === activeId && !activate) ||
+          (pageType === "script_event" && parentId === activeId && !activate))
       ) {
         setEditorNonce((current) => current + 1);
       }
@@ -908,6 +942,30 @@ export function Workspace({
                 ? {
                     ...page,
                     content: insertChapterEventMarker(page.content, draggedId),
+                    updatedAt: Date.now(),
+                  }
+                : page,
+            );
+          }
+        }
+        if (dragged?.pageType === "script_event") {
+          if (oldParentId && oldParentId !== moved?.parentId) {
+            patched = patched.map((page) =>
+              page.id === oldParentId && page.pageType === "script"
+                ? {
+                    ...page,
+                    content: removeScriptEventMarker(page.content, draggedId),
+                    updatedAt: Date.now(),
+                  }
+                : page,
+            );
+          }
+          if (moved?.parentId && moved.parentId !== oldParentId) {
+            patched = patched.map((page) =>
+              page.id === moved.parentId && page.pageType === "script"
+                ? {
+                    ...page,
+                    content: insertScriptEventMarker(page.content, draggedId),
                     updatedAt: Date.now(),
                   }
                 : page,
@@ -974,7 +1032,11 @@ export function Workspace({
       const node = document.elementFromPoint(event.clientX, event.clientY);
       const row = node?.closest<HTMLElement>("[data-page-id]");
       const chapterRow = node?.closest<HTMLElement>("[data-chapter-id]");
-      const targetId = row?.dataset.pageId ?? chapterRow?.dataset.chapterId;
+      const scriptRow = node?.closest<HTMLElement>("[data-script-id]");
+      const targetId =
+        row?.dataset.pageId ??
+        chapterRow?.dataset.chapterId ??
+        scriptRow?.dataset.scriptId;
       const ontoRoot = Boolean(node?.closest("[data-story-root]"));
       if (targetId && targetId !== drag.pageId) {
         const drop: PageDrop = { type: "inside", targetId };
@@ -1325,11 +1387,14 @@ export function Workspace({
             : page;
         }
         let content =
-          pageType === "script"
+          pageType === "script" || pageType === "script_event"
             ? htmlToScriptHtml(page.content)
             : page.content;
         if (previous?.pageType === "chapter" && pageType !== "chapter") {
           content = syncChapterEventMarkers(content, []);
+        }
+        if (previous?.pageType === "script" && pageType !== "script") {
+          content = syncScriptEventMarkers(content, []);
         }
         return {
           ...page,
@@ -1353,10 +1418,23 @@ export function Workspace({
             : page,
         );
       }
+      if (pageType === "script") {
+        const eventIds = scriptEventChildren(next, pageId).map(
+          (event) => event.id,
+        );
+        next = next.map((page) =>
+          page.id === pageId
+            ? {
+                ...page,
+                content: syncScriptEventMarkers(page.content, eventIds),
+              }
+            : page,
+        );
+      }
       return next;
     });
     if (pageType === "chapter") setChaptersOpen(true);
-    if (pageType === "script") {
+    if (pageType === "script" || pageType === "script_event") {
       setScriptsOpen(true);
       setEditorNonce((current) => current + 1);
     }
@@ -1368,6 +1446,16 @@ export function Workspace({
       (event) => event.id,
     );
     const next = syncChapterEventMarkers(activePage.content, eventIds);
+    if (next === activePage.content) return;
+    updatePage(activePage.id, { content: next });
+  }, [activePage, pages, readOnly, updatePage]);
+
+  useEffect(() => {
+    if (!activePage || activePage.pageType !== "script" || readOnly) return;
+    const eventIds = scriptEventChildren(pages, activePage.id).map(
+      (event) => event.id,
+    );
+    const next = syncScriptEventMarkers(activePage.content, eventIds);
     if (next === activePage.content) return;
     updatePage(activePage.id, { content: next });
   }, [activePage, pages, readOnly, updatePage]);
@@ -2217,9 +2305,24 @@ export function Workspace({
                     Set a page type to Script, or add one here.
                   </p>
                 ) : (
-                  scriptPages.map((page) => (
+                  scriptPages.map((page) => {
+                    const nestedEvents = scriptEventChildren(pages, page.id);
+                    const selectPage = (id: string) => {
+                      setActiveId(id);
+                      setTagTargetId(null);
+                      setTagPickerTargetId(null);
+                      setPages((current) =>
+                        current.map((candidate) =>
+                          candidate.id === id && candidate.unvisited
+                            ? { ...candidate, unvisited: false }
+                            : candidate,
+                        ),
+                      );
+                      if (isNarrow) setSidebarOpen(false);
+                    };
+                    return (
+                      <div key={page.id} className="chapter-tree">
                     <div
-                      key={page.id}
                       data-script-id={page.id}
                       className={`page-row ${
                         activeId === page.id ? "active" : ""
@@ -2255,19 +2358,7 @@ export function Workspace({
                           .charAt(0)
                           .toUpperCase()}
                         title={page.title || "Untitled"}
-                        onClick={() => {
-                          setActiveId(page.id);
-                          setTagTargetId(null);
-                          setTagPickerTargetId(null);
-                          setPages((current) =>
-                            current.map((candidate) =>
-                              candidate.id === page.id && candidate.unvisited
-                                ? { ...candidate, unvisited: false }
-                                : candidate,
-                            ),
-                          );
-                          if (isNarrow) setSidebarOpen(false);
-                        }}
+                        onClick={() => selectPage(page.id)}
                       >
                         <Clapperboard size={15} />
                         {page.unvisited && (
@@ -2278,6 +2369,19 @@ export function Workspace({
                         )}
                         <span>{page.title || "Untitled"}</span>
                       </button>
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          className="row-add"
+                          aria-label={`Add script event in ${page.title || "Untitled"}`}
+                          title="Add a nested script event"
+                          onClick={() =>
+                            createPage(page.id, "Untitled", true, "script_event")
+                          }
+                        >
+                          <Plus size={13} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="row-delete"
@@ -2288,7 +2392,69 @@ export function Workspace({
                         <Trash2 size={13} />
                       </button>
                     </div>
-                  ))
+                    {nestedEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        data-page-id={event.id}
+                        className={`page-row chapter-event-row ${
+                          activeId === event.id ? "active" : ""
+                        } ${event.unvisited ? "unvisited" : ""} ${
+                          draggingId === event.id ? "dragging" : ""
+                        } ${
+                          dropTargetId(dropTarget) === event.id
+                            ? `drop-${dropTarget?.type}`
+                            : ""
+                        }`}
+                      >
+                        {sidebarMode !== "rail" && !search.trim() && (
+                          <button
+                            type="button"
+                            className="page-drag-handle"
+                            aria-label={`Move ${event.title || "Untitled"}`}
+                            title="Drag onto Your story to un-nest"
+                            onPointerDown={(pointer) =>
+                              startPageDrag(pointer, event.id)
+                            }
+                            onPointerMove={updatePageDrag}
+                            onPointerUp={finishPageDrag}
+                            onPointerCancel={finishPageDrag}
+                            onLostPointerCapture={finishPageDrag}
+                          >
+                            <GripVertical size={13} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="page-name"
+                          data-initial={(event.title || "Untitled")
+                            .charAt(0)
+                            .toUpperCase()}
+                          title={event.title || "Untitled"}
+                          onClick={() => selectPage(event.id)}
+                        >
+                          <Clapperboard size={15} />
+                          {event.unvisited && (
+                            <span
+                              className="unvisited-page-dot"
+                              title="New page"
+                            />
+                          )}
+                          <span>{event.title || "Untitled"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="row-delete"
+                          aria-label={`Delete ${event.title}`}
+                          title="Delete script event"
+                          onClick={() => deletePage(event.id)}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                      </div>
+                    );
+                  })
                 )}
               </nav>
             )}
@@ -2732,7 +2898,7 @@ export function Workspace({
             onUpdatePage={updatePage}
           />
         ) : (
-          <article className={`document ${activePage.pageType === "script" ? "script-document" : ""}`}>
+          <article className={`document ${activePage.pageType === "script" || activePage.pageType === "script_event" ? "script-document" : ""}`}>
             <div className="document-meta">
               <span>{PAGE_TYPE_LABELS[activePage.pageType].toUpperCase()}</span>
               <span>•</span>
@@ -2841,6 +3007,10 @@ export function Workspace({
                   !(
                     activePage.pageType === "chapter" &&
                     page.pageType === "event"
+                  ) &&
+                  !(
+                    activePage.pageType === "script" &&
+                    page.pageType === "script_event"
                   ),
               );
               if (nestedPages.length === 0) return null;
@@ -2931,7 +3101,8 @@ export function Workspace({
                 })}
               </div>
             )}
-            {activePage.pageType === "script" ? (
+            {activePage.pageType === "script" ||
+            activePage.pageType === "script_event" ? (
               <ScriptEditor
                 key={`${activePage.id}-${editorNonce}`}
                 content={htmlToScriptHtml(activePage.content)}
@@ -2976,6 +3147,15 @@ export function Workspace({
                   window.setTimeout(() => setNotice(""), 2200);
                 }}
                 onRequestImport={() => setImportChapterOpen(true)}
+                scriptEvents={
+                  activePage.pageType === "script"
+                    ? scriptEventChildren(pages, activePage.id).map((event) => ({
+                        id: event.id,
+                        title: event.title,
+                        content: event.content,
+                      }))
+                    : undefined
+                }
                 onNavigatePage={(id) => {
                   if (!pages.some((page) => page.id === id)) return;
                   setActiveId(id);
@@ -3257,7 +3437,13 @@ export function Workspace({
               title: page.title,
               content:
                 exportKind === "script"
-                  ? page.content
+                  ? expandScriptEventMarkers(
+                      page.content,
+                      scriptEventChildren(pages, page.id).map((event) => ({
+                        id: event.id,
+                        content: event.content,
+                      })),
+                    )
                   : expandChapterEventMarkers(
                       page.content,
                       chapterEventChildren(pages, page.id).map((event) => ({

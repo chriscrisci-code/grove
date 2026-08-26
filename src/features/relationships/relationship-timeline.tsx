@@ -320,7 +320,7 @@ export function RelationshipTimeline({
       <aside
         ref={trayRef}
         className="timeline-tray"
-        aria-label="Unused chapters, events, and script events"
+        aria-label="Unused chapters, scripts, and events"
       >
         <span className="eyebrow">NOT ON THE TIMELINE</span>
         {tray.length ? (

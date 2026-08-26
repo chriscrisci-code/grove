@@ -29,8 +29,13 @@ export type TimelineSourcePage = {
 
 export function isTimelinePageType(
   value: string,
-): value is "chapter" | "event" | "script_event" {
-  return value === "chapter" || value === "event" || value === "script_event";
+): value is "chapter" | "event" | "script" | "script_event" {
+  return (
+    value === "chapter" ||
+    value === "event" ||
+    value === "script" ||
+    value === "script_event"
+  );
 }
 
 export function parseTimelineY(value: string | undefined): number | null {

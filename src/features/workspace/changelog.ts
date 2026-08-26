@@ -3,7 +3,7 @@ export const CHANGELOG = [
     date: "August 26, 2026",
     items: [
       "Script event is a new page type that nests under Scripts the way Events nest under Chapters, with movable blocks in the script and expansion in the screenplay PDF.",
-      "Script event pages use script format, and they can be placed on the Timeline with Chapters and Events.",
+      "Script event pages use script format, and Scripts and Script events can be placed on the Timeline with Chapters and Events.",
     ],
   },
   {

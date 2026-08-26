@@ -102,7 +102,7 @@ const SECTIONS = [
       },
       {
         keys: ["Tray"],
-        text: "Unused Chapters and Events wait here. Click one to place it after the last card, or drag it onto a rainbow lane.",
+        text: "Unused Chapters, Scripts, Events, and Script events wait here. Click one to place it after the last card, or drag it onto a rainbow lane.",
       },
       {
         keys: ["Lanes"],
@@ -135,7 +135,7 @@ const SECTIONS = [
       },
       {
         keys: ["Relationships"],
-        text: "Timeline orders Chapters, Events, and Script events. Web shows every named connection. Family builds a typed character tree.",
+        text: "Timeline orders Chapters, Scripts, Events, and Script events. Web shows every named connection. Family builds a typed character tree.",
       },
       {
         keys: ["Review"],

@@ -77,7 +77,7 @@ const SECTIONS = [
       },
       {
         keys: ["Tab", "Enter"],
-        text: "Enter makes the next script line. Tab from Action starts a Character cue, from Dialogue starts the next speaker, and on a Scene heading cycles INT. / EXT. / INT./EXT.",
+        text: "Enter makes the next script line. Tab from Action starts a Character cue, from Dialogue starts the next speaker. On a Scene heading, Tab cycles INT. / EXT. / INT./EXT. until you type a location; then Tab selects the time stamp and cycles DAY / NIGHT / DAWN / DUSK.",
       },
       {
         keys: ["/int", "/ext", "/c"],

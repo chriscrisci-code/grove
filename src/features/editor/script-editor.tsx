@@ -37,6 +37,7 @@ import {
   nextElementOnEnter,
   nextElementOnTab,
   normalizeScriptElement,
+  sceneSluglineTab,
   type ScriptElement,
 } from "@/features/editor/script-format";
 
@@ -111,6 +112,7 @@ function replaceCurrentBlock(
   text: string,
   element: ScriptElement,
   caret = text.length,
+  selectTo?: number,
 ) {
   const { $from } = editor.state.selection;
   const from = $from.start();
@@ -122,8 +124,12 @@ function replaceCurrentBlock(
     .command(({ tr, dispatch }) => {
       if (dispatch) {
         tr.insertText(text, from, to);
-        const pos = from + Math.max(0, Math.min(caret, text.length));
-        tr.setSelection(TextSelection.create(tr.doc, pos));
+        const anchor = from + Math.max(0, Math.min(caret, text.length));
+        const head =
+          selectTo === undefined
+            ? anchor
+            : from + Math.max(0, Math.min(selectTo, text.length));
+        tr.setSelection(TextSelection.create(tr.doc, anchor, head));
       }
       return true;
     })
@@ -629,8 +635,22 @@ export function ScriptEditor({
         }
         const kind = currentElement(editor);
         if (kind === "scene") {
-          const next = cycleSluglinePrefix(currentBlockText(editor));
-          replaceCurrentBlock(editor, next.text, "scene", next.caret);
+          const { $from, from, to, empty } = editor.state.selection;
+          const blockStart = $from.start();
+          const next = sceneSluglineTab(
+            currentBlockText(editor),
+            from - blockStart,
+            to - blockStart,
+            empty,
+            event.shiftKey,
+          );
+          replaceCurrentBlock(
+            editor,
+            next.text,
+            "scene",
+            next.caret,
+            next.selectTo,
+          );
           return true;
         }
         const next = nextElementOnTab(kind);

@@ -41,6 +41,18 @@ export const SLUGLINE_TIMES = [
   "SAME",
 ] as const;
 
+/** Times cycled by Tab once a Scene location has been typed. */
+export const SLUGLINE_TAB_TIMES = ["DAY", "NIGHT", "DAWN", "DUSK"] as const;
+
+export type ParsedSlugline = {
+  prefix: string;
+  location: string;
+  time: string;
+  hasLocation: boolean;
+  timeFrom: number;
+  timeTo: number;
+};
+
 export type ScriptLine = {
   element: ScriptElement;
   text: string;
@@ -148,6 +160,116 @@ export function cycleSluglinePrefix(text: string): { text: string; caret: number
   const body = rest || "- DAY";
   const nextText = `${next} ${body}`.replace(/\s+/g, " ").trim();
   return { text: nextText, caret: next.length + 1 };
+}
+
+export function parseSlugline(text: string): ParsedSlugline | null {
+  const prefixMatch = text.match(/^(INT\.\/EXT\.|INT\.|EXT\.|EST\.)\s*/i);
+  if (!prefixMatch) return null;
+  const prefix = prefixMatch[1]!.toUpperCase();
+  const bodyStart = prefixMatch[0].length;
+  const body = text.slice(bodyStart);
+  const timeMatch = body.match(/^(.*?)(\s*[-–—]\s*)([A-Z][A-Z0-9 /]*)$/u);
+  if (!timeMatch) {
+    const location = body.trim();
+    return {
+      prefix,
+      location,
+      time: "",
+      hasLocation: location.length > 0,
+      timeFrom: text.length,
+      timeTo: text.length,
+    };
+  }
+  const locationRaw = timeMatch[1]!;
+  const separator = timeMatch[2]!;
+  const timeToken = timeMatch[3]!;
+  const location = locationRaw.trim();
+  const timeFrom = bodyStart + locationRaw.length + separator.length;
+  const timeTo = timeFrom + timeToken.length;
+  return {
+    prefix,
+    location,
+    time: timeToken.toUpperCase(),
+    hasLocation: location.length > 0,
+    timeFrom,
+    timeTo,
+  };
+}
+
+export function isFocusOnSluglineTime(
+  text: string,
+  offsetFrom: number,
+  offsetTo: number,
+  empty: boolean,
+) {
+  const parsed = parseSlugline(text);
+  if (!parsed || !parsed.time) return false;
+  if (!empty && offsetFrom === parsed.timeFrom && offsetTo === parsed.timeTo) {
+    return true;
+  }
+  if (empty && offsetFrom >= parsed.timeFrom && offsetFrom <= parsed.timeTo) {
+    return true;
+  }
+  return false;
+}
+
+export function cycleSluglineTime(
+  text: string,
+  direction = 1,
+): { text: string; caretFrom: number; caretTo: number } {
+  const parsed = parseSlugline(text);
+  const current = parsed?.time || "DAY";
+  const index = SLUGLINE_TAB_TIMES.findIndex((stamp) => stamp === current);
+  const start = index >= 0 ? index : 0;
+  const length = SLUGLINE_TAB_TIMES.length;
+  const next =
+    SLUGLINE_TAB_TIMES[((start + direction) % length + length) % length]!;
+  const nextText = applySluglineTime(text.trim() || "INT.  - DAY", next);
+  const nextParsed = parseSlugline(nextText);
+  return {
+    text: nextText,
+    caretFrom: nextParsed?.timeFrom ?? nextText.length,
+    caretTo: nextParsed?.timeTo ?? nextText.length,
+  };
+}
+
+export type SceneSluglineTabResult = {
+  text: string;
+  caret: number;
+  selectTo?: number;
+};
+
+/** Tab on a Scene slugline: INT/EXT until location is typed, then focus/cycle time. */
+export function sceneSluglineTab(
+  text: string,
+  offsetFrom: number,
+  offsetTo: number,
+  empty: boolean,
+  shift = false,
+): SceneSluglineTabResult {
+  const parsed = parseSlugline(text);
+  if (!parsed?.hasLocation) {
+    const next = cycleSluglinePrefix(text);
+    return { text: next.text, caret: next.caret };
+  }
+  const onTime = isFocusOnSluglineTime(text, offsetFrom, offsetTo, empty);
+  if (!onTime && !shift) {
+    return {
+      text,
+      caret: parsed.timeFrom,
+      selectTo: parsed.timeTo,
+    };
+  }
+  if (!onTime && shift) {
+    const next = cycleSluglinePrefix(text);
+    return { text: next.text, caret: next.caret };
+  }
+  const cycled = cycleSluglineTime(text, shift ? -1 : 1);
+  return {
+    text: cycled.text,
+    caret: cycled.caretFrom,
+    selectTo: cycled.caretTo,
+  };
 }
 
 export function applySluglineTime(text: string, time: string): string {

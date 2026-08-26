@@ -14,6 +14,7 @@ import {
   nextElementOnTab,
   proseParagraphsToScriptLines,
   proseToScriptHtml,
+  sceneSluglineTab,
 } from "./script-format";
 
 describe("script element flow", () => {
@@ -46,6 +47,46 @@ describe("sluglines and slash commands", () => {
       "INT. ALLEY - NIGHT",
     );
     expect(applySluglineTime("INT. ALLEY", "DAWN")).toBe("INT. ALLEY - DAWN");
+  });
+
+  it("Tabs INT/EXT until location is typed, then focuses and cycles time", () => {
+    const emptyLocation = sceneSluglineTab("INT.  - DAY", 5, 5, true);
+    expect(emptyLocation.text).toBe("EXT. - DAY");
+    expect(emptyLocation.selectTo).toBeUndefined();
+
+    const withLocation = sceneSluglineTab("INT. KITCHEN - DAY", 8, 8, true);
+    expect(withLocation).toEqual({
+      text: "INT. KITCHEN - DAY",
+      caret: "INT. KITCHEN - ".length,
+      selectTo: "INT. KITCHEN - DAY".length,
+    });
+
+    const onTime = sceneSluglineTab(
+      "INT. KITCHEN - DAY",
+      "INT. KITCHEN - ".length,
+      "INT. KITCHEN - DAY".length,
+      false,
+    );
+    expect(onTime.text).toBe("INT. KITCHEN - NIGHT");
+    expect(onTime.caret).toBe("INT. KITCHEN - ".length);
+    expect(onTime.selectTo).toBe("INT. KITCHEN - NIGHT".length);
+
+    const dusk = sceneSluglineTab(
+      "INT. KITCHEN - NIGHT",
+      "INT. KITCHEN - ".length,
+      "INT. KITCHEN - NIGHT".length,
+      false,
+    );
+    expect(dusk.text).toBe("INT. KITCHEN - DAWN");
+
+    const back = sceneSluglineTab(
+      "INT. KITCHEN - DAWN",
+      "INT. KITCHEN - ".length,
+      "INT. KITCHEN - DAWN".length,
+      false,
+      true,
+    );
+    expect(back.text).toBe("INT. KITCHEN - NIGHT");
   });
 
   it("turns /int into a scene heading", () => {

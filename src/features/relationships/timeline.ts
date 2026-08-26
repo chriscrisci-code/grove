@@ -12,7 +12,7 @@ export const TIMELINE_LANE_COLORS = [
   "#4a7f9e",
   "#7a5a9a",
 ] as const;
-export const TIMELINE_CARD_HEIGHT = 38;
+export const TIMELINE_CARD_HEIGHT = 29;
 export const TIMELINE_CARD_GAP = 56;
 export const TIMELINE_DEFAULT_Y = 48;
 export const TIMELINE_MIN_EXTENT = 640;
@@ -74,7 +74,8 @@ export function timelineLaneCenter(lane: number, usableWidth: number): number {
 
 export function timelineCardWidth(usableWidth: number, boardWidth: number): number {
   const laneWidth = usableWidth / TIMELINE_LANE_COUNT;
-  return Math.min(Math.max(laneWidth * 2.55, 144), boardWidth * 0.75);
+  const full = Math.min(Math.max(laneWidth * 2.55, 144), boardWidth * 0.75);
+  return full * 0.75;
 }
 
 export function timelineCardLeft(

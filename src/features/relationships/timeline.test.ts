@@ -77,7 +77,7 @@ describe("timeline helpers", () => {
     expect(snapTimelineLane(599, 600)).toBe(5);
     expect(serializeTimelineLane(9)).toBe("5");
     expect(timelineCardWidth(600, 720)).toBeGreaterThan(600 / 6);
-    expect(timelineCardWidth(600, 720)).toBeLessThanOrEqual(720 * 0.75);
+    expect(timelineCardWidth(600, 720)).toBeLessThanOrEqual(720 * 0.75 * 0.75);
   });
 
   it("keeps the snap dot on the lane when a card is clamped to the board", () => {

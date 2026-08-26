@@ -291,7 +291,11 @@ export function RelationshipTimeline({
       placePage(drag.id, drag.liveY, drag.liveLane);
       return;
     }
-    if (namingId !== drag.id) onOpenPage(drag.id);
+  }
+
+  function openCardPage(pageId: string) {
+    if (namingId === pageId) return;
+    onOpenPage(pageId);
   }
 
   function createEventAt(event: ReactMouseEvent<HTMLDivElement>) {
@@ -402,6 +406,10 @@ export function RelationshipTimeline({
                   cardDragRef.current = null;
                   setCardDrag(null);
                 }}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  openCardPage(page.id);
+                }}
               >
                 <span
                   className="timeline-card-snap"
@@ -448,7 +456,7 @@ export function RelationshipTimeline({
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={() => unplacePage(page.id)}
                 >
-                  <X size={14} />
+                  <X size={11} />
                 </button>
               </div>
             );

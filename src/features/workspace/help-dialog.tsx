@@ -34,7 +34,7 @@ const SECTIONS = [
       },
       {
         keys: ["Alt+L", "/link"],
-        text: "Find Links wraps names on this page that already have pages, including Also known as names. It does not create pages.",
+        text: "Find Links wraps names on this page that already have pages, including Also known as names. Press again to hide or show those links. It does not create pages.",
       },
     ],
   },

@@ -135,6 +135,8 @@ export function StoryEditor({
   );
   const [wordLookup, setWordLookup] = useState<WordLookup | null>(null);
   const [wordLookupLoading, setWordLookupLoading] = useState(false);
+  const [findLinksDone, setFindLinksDone] = useState(false);
+  const [linksHidden, setLinksHidden] = useState(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const committedSpeechRef = useRef("");
   const dictationFromRef = useRef(0);
@@ -340,6 +342,11 @@ export function StoryEditor({
     [editor, onOpenRelate, tagTarget?.id],
   );
 
+  useEffect(() => {
+    setFindLinksDone(false);
+    setLinksHidden(false);
+  }, [currentPageId]);
+
   const findExistingPageLinks = useCallback(
     (removeSlashCommand = false) => {
       if (!editor || isChapterEventDragging()) return false;
@@ -384,11 +391,22 @@ export function StoryEditor({
 
       if (tr.docChanged) editor.view.dispatch(tr);
       else editor.chain().focus().run();
+      setLinksHidden(false);
+      setFindLinksDone(true);
       onFindLinks(pending.length);
       return true;
     },
     [currentPageId, editor, linkablePages, onFindLinks],
   );
+
+  const handleLinksAction = useCallback(() => {
+    if (findLinksDone) {
+      setLinksHidden((hidden) => !hidden);
+      editor?.chain().focus().run();
+      return true;
+    }
+    return findExistingPageLinks();
+  }, [editor, findExistingPageLinks, findLinksDone]);
 
   useEffect(() => {
     if (!editor) return;
@@ -511,7 +529,7 @@ export function StoryEditor({
 
       if (event.key.toLowerCase() === "l") {
         event.preventDefault();
-        findExistingPageLinks();
+        handleLinksAction();
         return;
       }
 
@@ -526,6 +544,7 @@ export function StoryEditor({
     createPageFromEditorText,
     editor,
     findExistingPageLinks,
+    handleLinksAction,
     onOpenAi,
     openRelateCommand,
     openTagCommand,
@@ -814,11 +833,24 @@ export function StoryEditor({
         </button>
         <button
           type="button"
-          className="find-links-button"
-          title="Find Links — wrap names on this page that already have pages"
-          aria-label="Find Links"
+          className={`find-links-button ${linksHidden ? "links-hidden-active" : ""}`}
+          title={
+            !findLinksDone
+              ? "Find Links — wrap names on this page that already have pages"
+              : linksHidden
+                ? "Show links"
+                : "Hide links"
+          }
+          aria-label={
+            !findLinksDone
+              ? "Find Links"
+              : linksHidden
+                ? "Show links"
+                : "Hide links"
+          }
+          aria-pressed={findLinksDone ? !linksHidden : undefined}
           onMouseDown={(event) => event.preventDefault()}
-          onClick={() => findExistingPageLinks()}
+          onClick={() => handleLinksAction()}
         >
           <Link2 size={16} />
           <span>Links</span>
@@ -867,9 +899,11 @@ export function StoryEditor({
       )}
       <ChapterEventContext.Provider value={chapterEventValue}>
         <div
+          className={linksHidden ? "links-hidden" : undefined}
           onClick={(event) => {
             const target = event.target;
             if (!(target instanceof Element)) return;
+            if (linksHidden) return;
             const link = target.closest<HTMLAnchorElement>("a.story-link");
             const match = link?.getAttribute("href")?.match(/^#page-(.+)$/);
             if (!match) return;

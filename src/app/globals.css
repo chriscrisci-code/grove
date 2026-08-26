@@ -1843,6 +1843,12 @@ body.dragging-chapter-event .editor-toolbar {
   text-decoration: none;
   cursor: pointer;
 }
+.links-hidden .story-link {
+  border-bottom-color: transparent;
+  color: inherit;
+  cursor: text;
+  pointer-events: none;
+}
 .chapter-event-block {
   display: flex;
   gap: 10px;

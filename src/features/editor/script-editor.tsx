@@ -258,6 +258,8 @@ export function ScriptEditor({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerIndex, setPickerIndex] = useState(0);
   const [started, setStarted] = useState(!isScriptHtmlEmpty(content));
+  const [findLinksDone, setFindLinksDone] = useState(false);
+  const [linksHidden, setLinksHidden] = useState(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const committedSpeechRef = useRef("");
   const dictationFromRef = useRef(0);
@@ -507,11 +509,27 @@ export function ScriptEditor({
       }
       if (tr.docChanged) editor.view.dispatch(tr);
       else editor.chain().focus().run();
+      setLinksHidden(false);
+      setFindLinksDone(true);
       onFindLinks(pending.length);
       return true;
     },
     [currentPageId, editor, linkablePages, onFindLinks],
   );
+
+  const handleLinksAction = useCallback(() => {
+    if (findLinksDone) {
+      setLinksHidden((hidden) => !hidden);
+      editor?.chain().focus().run();
+      return true;
+    }
+    return findExistingPageLinks();
+  }, [editor, findExistingPageLinks, findLinksDone]);
+
+  useEffect(() => {
+    setFindLinksDone(false);
+    setLinksHidden(false);
+  }, [currentPageId]);
 
   const applySlashIfPresent = useCallback(() => {
     if (!editor) return false;
@@ -682,7 +700,7 @@ export function ScriptEditor({
       }
       if (event.key.toLowerCase() === "l") {
         event.preventDefault();
-        findExistingPageLinks();
+        handleLinksAction();
         return true;
       }
       if (event.key.toLowerCase() === "c") {
@@ -730,6 +748,7 @@ export function ScriptEditor({
       createPageFromEditorText,
       editor,
       findExistingPageLinks,
+      handleLinksAction,
       onOpenAi,
       openRelateCommand,
       openTagCommand,
@@ -1015,11 +1034,24 @@ export function ScriptEditor({
           </button>
           <button
             type="button"
-            className="find-links-button"
-            title="Find Links — wrap names on this page that already have pages"
-            aria-label="Find Links"
+            className={`find-links-button ${linksHidden ? "links-hidden-active" : ""}`}
+            title={
+              !findLinksDone
+                ? "Find Links — wrap names on this page that already have pages"
+                : linksHidden
+                  ? "Show links"
+                  : "Hide links"
+            }
+            aria-label={
+              !findLinksDone
+                ? "Find Links"
+                : linksHidden
+                  ? "Show links"
+                  : "Hide links"
+            }
+            aria-pressed={findLinksDone ? !linksHidden : undefined}
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => findExistingPageLinks()}
+            onClick={() => handleLinksAction()}
           >
             <Link2 size={16} />
             <span>Links</span>
@@ -1102,10 +1134,16 @@ export function ScriptEditor({
         </div>
       )}
       <div
-        className={showEmptyStart ? "script-editor-host dimmed" : "script-editor-host"}
+        className={[
+          showEmptyStart ? "script-editor-host dimmed" : "script-editor-host",
+          linksHidden ? "links-hidden" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={(event) => {
           const target = event.target;
           if (!(target instanceof Element)) return;
+          if (linksHidden) return;
           const link = target.closest<HTMLAnchorElement>("a.story-link");
           const match = link?.getAttribute("href")?.match(/^#page-(.+)$/);
           if (!match) return;

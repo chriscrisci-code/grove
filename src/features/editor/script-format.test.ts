@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyScriptSlash,
   applySluglineTime,
+  bestCharacterAutofill,
   collectCharacterNamesFromHtml,
   cycleSluglinePrefix,
   filterCharacterSuggestions,
@@ -79,6 +80,20 @@ describe("character suggestions", () => {
     expect(
       filterCharacterSuggestions("mar", ["Demar", "Mara", "Marigold"], ["Demar"]),
     ).toEqual(["Mara", "Marigold", "Demar"]);
+  });
+
+  it("autofills the best Character-page prefix as letters refine", () => {
+    expect(
+      bestCharacterAutofill("M", ["Mara", "Morgan", "Jane"], []),
+    ).toEqual({ match: "Mara", typed: "M" });
+    expect(
+      bestCharacterAutofill("Ma", ["Mara", "Morgan", "Jane"], []),
+    ).toEqual({ match: "Mara", typed: "Ma" });
+    expect(
+      bestCharacterAutofill("Mo", ["Mara", "Morgan", "Jane"], []),
+    ).toEqual({ match: "Morgan", typed: "Mo" });
+    expect(bestCharacterAutofill("Z", ["Mara", "Morgan"], [])).toBeNull();
+    expect(bestCharacterAutofill("", ["Mara"], [])).toBeNull();
   });
 });
 

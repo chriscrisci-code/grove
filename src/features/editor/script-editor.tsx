@@ -28,6 +28,7 @@ import {
   SCRIPT_ELEMENT_LABELS,
   SCRIPT_ELEMENT_TITLES,
   applyScriptSlash,
+  bestCharacterAutofill,
   collectCharacterNamesFromHtml,
   cycleSluglinePrefix,
   filterCharacterSuggestions,
@@ -146,6 +147,71 @@ function splitToElement(editor: Editor, element: ScriptElement) {
     .run();
 }
 
+/** Typed cue prefix when a ghost completion is selected, else full block text. */
+function characterTypedPrefix(editor: Editor) {
+  const { from, to, empty, $from } = editor.state.selection;
+  const blockStart = $from.start();
+  const blockEnd = $from.end();
+  const full = $from.parent.textContent;
+  if (!empty && to === blockEnd && from >= blockStart && from <= blockEnd) {
+    return full.slice(0, Math.max(0, from - blockStart));
+  }
+  return full;
+}
+
+function applyInlineCharacterAutofill(
+  editor: Editor,
+  catalog: string[],
+  recent: string[],
+) {
+  if (currentElement(editor) !== "character") return false;
+  const { from, to, empty, $from } = editor.state.selection;
+  const blockStart = $from.start();
+  const blockEnd = $from.end();
+  const full = $from.parent.textContent;
+  const hasGhost =
+    !empty && to === blockEnd && from > blockStart && from <= blockEnd;
+  if (!hasGhost && (from !== to || from !== blockEnd)) return false;
+
+  const typed = hasGhost
+    ? full.slice(0, Math.max(0, from - blockStart))
+    : full;
+  const autofill = bestCharacterAutofill(typed, catalog, recent);
+  if (!autofill) return false;
+
+  const cue = autofill.match.toUpperCase();
+  const typedLen = typed.length;
+  if (full === cue && from === blockStart + typedLen && to === blockEnd) {
+    return false;
+  }
+
+  return editor
+    .chain()
+    .focus()
+    .updateAttributes("paragraph", { script: "character" })
+    .command(({ tr, dispatch }) => {
+      if (dispatch) {
+        tr.insertText(cue, blockStart, blockEnd);
+        const selectFrom = blockStart + typedLen;
+        const selectTo = blockStart + cue.length;
+        tr.setSelection(TextSelection.create(tr.doc, selectFrom, selectTo));
+      }
+      return true;
+    })
+    .run();
+}
+
+function previousParagraphIsCharacter(editor: Editor) {
+  const { $from } = editor.state.selection;
+  if ($from.depth < 1) return false;
+  const index = $from.index($from.depth - 1);
+  if (index <= 0) return false;
+  const parent = $from.node($from.depth - 1);
+  const previous = parent.child(index - 1);
+  if (previous.type.name !== "paragraph") return false;
+  return normalizeScriptElement(previous.attrs.script) === "character";
+}
+
 export function ScriptEditor({
   content,
   onChange,
@@ -200,6 +266,10 @@ export function ScriptEditor({
   const lastSpeechAtRef = useRef(0);
   const restartTimerRef = useRef<number | null>(null);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
+  const autofillGuardRef = useRef(false);
+  const characterNamesRef = useRef(characterNames);
+  const recentCharactersRef = useRef<string[]>([]);
+  characterNamesRef.current = characterNames;
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -241,7 +311,27 @@ export function ScriptEditor({
         keyHandlerRef.current(event as unknown as KeyboardEvent),
     },
     onUpdate: ({ editor: currentEditor }) => {
-      if (!readOnly) onChange(currentEditor.getHTML());
+      if (readOnly) return;
+      if (autofillGuardRef.current) {
+        onChange(currentEditor.getHTML());
+        return;
+      }
+      onChange(currentEditor.getHTML());
+      if (currentElement(currentEditor) !== "character") return;
+      autofillGuardRef.current = true;
+      try {
+        const applied = applyInlineCharacterAutofill(
+          currentEditor,
+          characterNamesRef.current,
+          recentCharactersRef.current,
+        );
+        if (applied) {
+          setPickerOpen(true);
+          setPickerIndex(0);
+        }
+      } finally {
+        autofillGuardRef.current = false;
+      }
     },
     onSelectionUpdate: ({ editor: currentEditor, transaction }) => {
       if (transaction.docChanged) return;
@@ -279,8 +369,11 @@ export function ScriptEditor({
     () => (editor ? collectCharacterNamesFromHtml(editor.getHTML()) : []),
     [editor, editor?.state.doc],
   );
+  recentCharactersRef.current = recentCharacters;
   const characterQuery =
-    editor && currentElement(editor) === "character" ? currentBlockText(editor) : "";
+    editor && currentElement(editor) === "character"
+      ? characterTypedPrefix(editor)
+      : "";
   const suggestions = useMemo(
     () =>
       filterCharacterSuggestions(
@@ -491,6 +584,10 @@ export function ScriptEditor({
       }
       if (showingPicker && event.key === "Escape") {
         setPickerOpen(false);
+        if (currentElement(editor) === "character") {
+          const typed = characterTypedPrefix(editor);
+          replaceCurrentBlock(editor, typed.toUpperCase(), "character");
+        }
         return true;
       }
 
@@ -500,6 +597,17 @@ export function ScriptEditor({
         if (showingPicker && !event.shiftKey) {
           pickCharacter(suggestions[pickerIndex] ?? suggestions[0]);
           return true;
+        }
+        if (
+          !event.shiftKey &&
+          currentElement(editor) === "character" &&
+          !editor.state.selection.empty
+        ) {
+          const cue = currentBlockText(editor).trim();
+          if (cue) {
+            pickCharacter(cue);
+            return true;
+          }
         }
         const kind = currentElement(editor);
         if (kind === "scene") {
@@ -542,6 +650,13 @@ export function ScriptEditor({
           pickCharacter(suggestions[pickerIndex] ?? suggestions[0], true);
           return true;
         }
+        if (currentElement(editor) === "character") {
+          const cue = currentBlockText(editor).trim();
+          if (cue) {
+            pickCharacter(cue, true);
+            return true;
+          }
+        }
         splitToElement(editor, nextElementOnEnter(currentElement(editor)));
         return true;
       }
@@ -581,6 +696,16 @@ export function ScriptEditor({
         setPickerOpen(true);
         setPickerIndex(0);
         return true;
+      }
+      if (event.key.toLowerCase() === "d") {
+        const { empty, $from } = editor.state.selection;
+        if (empty && $from.parentOffset === 0 && previousParagraphIsCharacter(editor)) {
+          event.preventDefault();
+          setStarted(true);
+          setCurrentElement(editor, "dialogue");
+          return true;
+        }
+        return false;
       }
       if (event.key.toLowerCase() === "s") {
         event.preventDefault();

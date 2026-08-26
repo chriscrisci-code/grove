@@ -293,6 +293,27 @@ export function filterCharacterSuggestions(
   return [...prefix, ...contains].slice(0, 12);
 }
 
+export type CharacterAutofill = {
+  match: string;
+  typed: string;
+};
+
+/** Best Character-page prefix match for inline cue completion. */
+export function bestCharacterAutofill(
+  query: string,
+  catalog: string[],
+  recent: string[] = [],
+): CharacterAutofill | null {
+  const typed = query.trim();
+  if (!typed) return null;
+  const needle = typed.toLocaleLowerCase();
+  const prefixMatches = filterCharacterSuggestions(typed, catalog, recent).filter(
+    (name) => name.toLocaleLowerCase().startsWith(needle),
+  );
+  if (prefixMatches.length === 0) return null;
+  return { match: prefixMatches[0]!, typed };
+}
+
 export function collectCharacterNamesFromHtml(html: string) {
   const names: string[] = [];
   const seen = new Set<string>();

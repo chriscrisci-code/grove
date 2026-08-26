@@ -5197,7 +5197,8 @@ body.dragging-chapter-event .editor-toolbar {
   .manuscript {
     width: auto;
     margin: 0;
-    padding: var(--manuscript-margin, 1in);
+    /* Sheet insets come from @page so every printed page gets top/bottom. */
+    padding: 0;
   }
   .manuscript h1,
   .manuscript-chapter h2 {
@@ -5211,7 +5212,7 @@ body.dragging-chapter-event .editor-toolbar {
     border-bottom: 0 !important;
   }
   @page {
-    margin: 0;
+    margin: var(--manuscript-margin, 1in);
   }
 }
 

@@ -6,6 +6,7 @@ export function stripHtmlLinks(html: string) {
 export type ManuscriptMargin = "narrow" | "normal" | "wide";
 
 export const MANUSCRIPT_MARGIN_STORAGE_KEY = "grove-manuscript-margin";
+export const MANUSCRIPT_MARGIN_CSS_VAR = "--manuscript-margin";
 
 export const MANUSCRIPT_MARGINS: Record<
   ManuscriptMargin,
@@ -26,4 +27,18 @@ export function readStoredManuscriptMargin(): ManuscriptMargin {
   return normalizeManuscriptMargin(
     localStorage.getItem(MANUSCRIPT_MARGIN_STORAGE_KEY),
   );
+}
+
+/** Put margin on :root so @page can use it when printing each sheet. */
+export function applyManuscriptMarginToDocument(margin: ManuscriptMargin) {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty(
+    MANUSCRIPT_MARGIN_CSS_VAR,
+    MANUSCRIPT_MARGINS[margin].inches,
+  );
+}
+
+export function clearManuscriptMarginFromDocument() {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.removeProperty(MANUSCRIPT_MARGIN_CSS_VAR);
 }

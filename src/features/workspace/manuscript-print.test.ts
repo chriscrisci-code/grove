@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  MANUSCRIPT_MARGINS,
   normalizeManuscriptMargin,
   stripHtmlLinks,
 } from "./manuscript-print";
@@ -16,5 +17,11 @@ describe("manuscript print helpers", () => {
   it("normalizes margin choices", () => {
     expect(normalizeManuscriptMargin("wide")).toBe("wide");
     expect(normalizeManuscriptMargin("nope")).toBe("normal");
+  });
+
+  it("maps each margin choice to an inch size for @page", () => {
+    expect(MANUSCRIPT_MARGINS.narrow.inches).toBe("0.5in");
+    expect(MANUSCRIPT_MARGINS.normal.inches).toBe("1in");
+    expect(MANUSCRIPT_MARGINS.wide.inches).toBe("1.5in");
   });
 });

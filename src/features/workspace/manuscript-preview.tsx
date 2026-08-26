@@ -5,6 +5,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import {
   MANUSCRIPT_MARGINS,
   MANUSCRIPT_MARGIN_STORAGE_KEY,
+  applyManuscriptMarginToDocument,
+  clearManuscriptMarginFromDocument,
   normalizeManuscriptMargin,
   readStoredManuscriptMargin,
   stripHtmlLinks,
@@ -28,8 +30,15 @@ export function ManuscriptPreview({
   const [margin, setMargin] = useState<ManuscriptMargin>("normal");
 
   useEffect(() => {
-    setMargin(readStoredManuscriptMargin());
+    const stored = readStoredManuscriptMargin();
+    setMargin(stored);
+    applyManuscriptMarginToDocument(stored);
+    return () => clearManuscriptMarginFromDocument();
   }, []);
+
+  useEffect(() => {
+    applyManuscriptMarginToDocument(margin);
+  }, [margin]);
 
   function chooseMargin(next: ManuscriptMargin) {
     setMargin(next);
@@ -44,7 +53,7 @@ export function ManuscriptPreview({
         <div
           className="manuscript-margin-controls"
           role="group"
-          aria-label="Page margins"
+          aria-label="Page margins on all sides"
         >
           <span>Margins</span>
           {(Object.keys(MANUSCRIPT_MARGINS) as ManuscriptMargin[]).map(

@@ -1926,10 +1926,11 @@ body.dragging-chapter-event .editor-toolbar {
   min-height: 420px;
   outline: 0;
   color: #1f2420;
-  /* Halfway weight: 500 with synthesis (600 was too heavy; 500+none looked like regular). */
-  font: 500 16.5px/1.4 "Courier New", Courier, ui-monospace, monospace;
+  /* Screenplay face: Courier Prime (revert stack to "Courier New", Courier if unwanted). */
+  font: 400 16.5px/1.4 "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
+  font-synthesis: none;
 }
-.script-editor p { margin: 0 0 .85em; font-weight: 500; }
+.script-editor p { margin: 0 0 .85em; font-weight: 400; }
 .script-editor p[data-script="scene"] {
   margin-top: 1.4em;
   font-weight: 700;
@@ -1944,7 +1945,7 @@ body.dragging-chapter-event .editor-toolbar {
 .script-editor p[data-script="parenthetical"] {
   margin: 0 24% .15em 28%;
   color: #3f463f;
-  font-weight: 500;
+  font-weight: 400;
 }
 .script-editor p[data-script="dialogue"] {
   margin: 0 16% .95em 20%;
@@ -2002,7 +2003,7 @@ body.dragging-chapter-event .editor-toolbar {
   padding: 4px 9px;
   color: #3d5546;
   cursor: pointer;
-  font: 650 10px/1.2 "Courier New", Courier, monospace;
+  font: 650 10px/1.2 "Courier Prime", "Courier New", Courier, monospace;
   text-transform: uppercase;
 }
 .script-character-picker button.active,
@@ -2826,14 +2827,15 @@ body.dragging-chapter-event .editor-toolbar {
 .manuscript-body p { margin: 0 0 1em; }
 .script-manuscript h1,
 .script-manuscript .manuscript-chapter h2 {
-  font-family: "Courier New", Courier, ui-monospace, monospace;
+  font-family: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
 }
 .script-body {
   color: #1f2420;
-  /* Match editor halfway weight — 500 with synthesis allowed. */
-  font: 500 13.5px/1.4 "Courier New", Courier, ui-monospace, monospace;
+  /* Match editor — Courier Prime regular/bold. */
+  font: 400 13.5px/1.4 "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
+  font-synthesis: none;
 }
-.script-body p { margin: 0 0 .85em; font-weight: 500; }
+.script-body p { margin: 0 0 .85em; font-weight: 400; }
 .script-body p[data-script="scene"] {
   margin-top: 1.3em;
   font-weight: 700;

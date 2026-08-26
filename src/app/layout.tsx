@@ -3,6 +3,8 @@ import { VisualViewportRoot } from "@/features/workspace/visual-viewport-root";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import "@fontsource/courier-prime/400.css";
+import "@fontsource/courier-prime/700.css";
 import "./globals.css";
 
 const geistSans = Geist({

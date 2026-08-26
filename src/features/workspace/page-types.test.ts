@@ -99,6 +99,10 @@ describe("page types and chapter order", () => {
     expect(PAGE_TYPE_FIELDS.unique_object.map((field) => field.key)).toEqual([
       "aka",
     ]);
+    expect(PAGE_TYPE_FIELDS.event.map((field) => field.key)).toEqual([
+      "synopsis",
+      "aka",
+    ]);
     expect(
       normalizePageFields({
         aka: "The Fox",

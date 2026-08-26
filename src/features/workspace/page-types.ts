@@ -27,6 +27,7 @@ export type PageFieldDef = {
   key: string;
   label: string;
   placeholder?: string;
+  multiline?: boolean;
 };
 
 export const PAGE_TYPE_LABELS: Record<PageType, string> = {
@@ -47,10 +48,17 @@ const AKA_FIELD: PageFieldDef = {
   placeholder: "Comma-separated names",
 };
 
+const SYNOPSIS_FIELD: PageFieldDef = {
+  key: "synopsis",
+  label: "Synopsis",
+  placeholder: "Short summary of this event",
+  multiline: true,
+};
+
 export const PAGE_TYPE_FIELDS: Record<PageType, PageFieldDef[]> = {
   page: [],
   chapter: [],
-  event: [AKA_FIELD],
+  event: [SYNOPSIS_FIELD, AKA_FIELD],
   script: [],
   character: [AKA_FIELD],
   location: [AKA_FIELD],

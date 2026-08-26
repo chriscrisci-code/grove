@@ -2771,22 +2771,45 @@ export function Workspace({
                 {PAGE_TYPE_FIELDS[activePage.pageType].map((field) => (
                   <label
                     key={field.key}
-                    className={field.key === "aka" ? "aka-field" : undefined}
+                    className={
+                      field.key === "aka"
+                        ? "aka-field"
+                        : field.multiline
+                          ? "synopsis-field"
+                          : undefined
+                    }
                   >
                     <span>{field.label}</span>
-                    <input
-                      value={activePage.fields[field.key] ?? ""}
-                      readOnly={readOnly}
-                      placeholder={field.placeholder}
-                      onChange={(event) =>
-                        updateActivePage({
-                          fields: {
-                            ...activePage.fields,
-                            [field.key]: event.target.value,
-                          },
-                        })
-                      }
-                    />
+                    {field.multiline ? (
+                      <textarea
+                        value={activePage.fields[field.key] ?? ""}
+                        readOnly={readOnly}
+                        placeholder={field.placeholder}
+                        rows={3}
+                        onChange={(event) =>
+                          updateActivePage({
+                            fields: {
+                              ...activePage.fields,
+                              [field.key]: event.target.value,
+                            },
+                          })
+                        }
+                      />
+                    ) : (
+                      <input
+                        value={activePage.fields[field.key] ?? ""}
+                        readOnly={readOnly}
+                        placeholder={field.placeholder}
+                        onChange={(event) =>
+                          updateActivePage({
+                            fields: {
+                              ...activePage.fields,
+                              [field.key]: event.target.value,
+                            },
+                          })
+                        }
+                      />
+                    )}
                   </label>
                 ))}
               </div>
@@ -2811,6 +2834,45 @@ export function Workspace({
                 aria-label="Page title"
               />
             </div>
+            {(() => {
+              const nestedPages = pages.filter(
+                (page) =>
+                  page.parentId === activePage.id &&
+                  !(
+                    activePage.pageType === "chapter" &&
+                    page.pageType === "event"
+                  ),
+              );
+              if (nestedPages.length === 0) return null;
+              return (
+                <div className="nested-pages-line" aria-label="Nested pages">
+                  <span>NESTED PAGES:</span>{" "}
+                  {nestedPages.map((page, index) => (
+                    <span key={page.id}>
+                      {index > 0 ? ", " : null}
+                      <button
+                        type="button"
+                        className="nested-page-link"
+                        onClick={() => {
+                          setActiveId(page.id);
+                          setTagTargetId(null);
+                          setTagPickerTargetId(null);
+                          setPages((current) =>
+                            current.map((candidate) =>
+                              candidate.id === page.id && candidate.unvisited
+                                ? { ...candidate, unvisited: false }
+                                : candidate,
+                            ),
+                          );
+                        }}
+                      >
+                        {page.title || "Untitled"}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
             {(pageTags[activePage.id] ?? []).length > 0 && (
               <div className="page-tag-list" aria-label="Page tags">
                 {(pageTags[activePage.id] ?? []).map((tagId) => {

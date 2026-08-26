@@ -794,12 +794,13 @@ export function ScriptEditor({
   const showPicker =
     !readOnly &&
     (pickerOpen || currentElement(editor) === "character") &&
-    suggestions.length > 0;
+    (suggestions.length > 0 || currentElement(editor) === "character");
 
   return (
     <div className="editor-frame">
       {!readOnly && (
-        <div className="editor-toolbar" aria-label="Script formatting">
+        <div className="editor-toolbar script-toolbar" aria-label="Script formatting">
+          <div className="script-element-row" role="toolbar" aria-label="Script elements">
           {SCRIPT_ELEMENTS.map((element) => (
             <button
               type="button"
@@ -817,6 +818,8 @@ export function ScriptEditor({
                 if (element === "character") {
                   setPickerOpen(true);
                   setPickerIndex(0);
+                } else {
+                  setPickerOpen(false);
                 }
               }}
             >
@@ -830,6 +833,9 @@ export function ScriptEditor({
               <span>{SCRIPT_ELEMENT_LABELS[element]}</span>
             </button>
           ))}
+          </div>
+          <p className="script-mobile-hint">Tap Char, then a name</p>
+          <div className="script-tool-row">
           <span className="toolbar-divider" aria-hidden="true" />
           {!writeShell && (
             <>
@@ -916,6 +922,7 @@ export function ScriptEditor({
           <span className="script-element-indicator">
             {SCRIPT_ELEMENT_TITLES[elementState].toUpperCase()}
           </span>
+          </div>
         </div>
       )}
       {dictationStatus && (
@@ -935,7 +942,12 @@ export function ScriptEditor({
       )}
       {showPicker && (
         <div className="script-character-picker" role="listbox" aria-label="Character names">
-          {suggestions.map((name, index) => (
+          {suggestions.length === 0 ? (
+            <span className="script-character-empty">
+              Type a name, or add Character pages to your story.
+            </span>
+          ) : (
+            suggestions.map((name, index) => (
             <button
               type="button"
               key={name}
@@ -947,7 +959,8 @@ export function ScriptEditor({
             >
               {name}
             </button>
-          ))}
+            ))
+          )}
         </div>
       )}
       {showEmptyStart && (

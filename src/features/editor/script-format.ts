@@ -256,18 +256,41 @@ export function filterCharacterSuggestions(
 ) {
   const needle = query.trim().toLocaleLowerCase();
   const seen = new Set<string>();
-  const result: string[] = [];
-  function add(name: string) {
+  const ordered: string[] = [];
+
+  function pushUnique(name: string) {
+    const label = name.trim();
+    const key = label.toLocaleLowerCase();
+    if (!label || key === "untitled" || seen.has(key)) return false;
+    seen.add(key);
+    ordered.push(label);
+    return true;
+  }
+
+  if (!needle) {
+    for (const name of recent) pushUnique(name);
+    for (const name of catalog) pushUnique(name);
+    return ordered.slice(0, 12);
+  }
+
+  const prefix: string[] = [];
+  const contains: string[] = [];
+  function consider(name: string) {
     const label = name.trim();
     const key = label.toLocaleLowerCase();
     if (!label || key === "untitled" || seen.has(key)) return;
-    if (needle && !key.startsWith(needle) && !key.includes(needle)) return;
-    seen.add(key);
-    result.push(label);
+    if (key.startsWith(needle)) {
+      seen.add(key);
+      prefix.push(label);
+    } else if (key.includes(needle)) {
+      seen.add(key);
+      contains.push(label);
+    }
   }
-  for (const name of recent) add(name);
-  for (const name of catalog) add(name);
-  return result.slice(0, 12);
+
+  for (const name of recent) consider(name);
+  for (const name of catalog) consider(name);
+  return [...prefix, ...contains].slice(0, 12);
 }
 
 export function collectCharacterNamesFromHtml(html: string) {

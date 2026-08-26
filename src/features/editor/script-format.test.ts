@@ -74,6 +74,12 @@ describe("character suggestions", () => {
       filterCharacterSuggestions("", ["Mara", "Jane"], ["Joss"]),
     ).toEqual(["Joss", "Mara", "Jane"]);
   });
+
+  it("prefers prefix matches over contains matches", () => {
+    expect(
+      filterCharacterSuggestions("mar", ["Demar", "Mara", "Marigold"], ["Demar"]),
+    ).toEqual(["Mara", "Marigold", "Demar"]);
+  });
 });
 
 describe("chapter import", () => {

@@ -32,7 +32,7 @@ describe("chapter event markers", () => {
     ]);
   });
 
-  it("expands markers to event text for print without titles", () => {
+  it("expands markers to event text for print without titles or synopsis", () => {
     const html = `<p>Before.</p>${chapterEventMarkerHtml("storm")}<p>After.</p>`;
     const expanded = expandChapterEventMarkers(html, [
       {
@@ -44,6 +44,7 @@ describe("chapter event markers", () => {
       "<p>Before.</p><p>Rain hit the quay.</p><p>After.</p>",
     );
     expect(expanded).not.toContain("The Storm");
+    expect(expanded).not.toContain("A sudden squall");
     expect(expanded).not.toContain("manuscript-event");
     expect(expanded).not.toContain("<h3>");
     expect(expanded).not.toContain("chapter-event");

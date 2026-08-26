@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MANUSCRIPT_MARGINS,
+  buildManuscriptPrintPageCss,
   normalizeManuscriptMargin,
   stripHtmlLinks,
 } from "./manuscript-print";
@@ -23,5 +24,15 @@ describe("manuscript print helpers", () => {
     expect(MANUSCRIPT_MARGINS.narrow.inches).toBe("0.5in");
     expect(MANUSCRIPT_MARGINS.normal.inches).toBe("1in");
     expect(MANUSCRIPT_MARGINS.wide.inches).toBe("1.5in");
+  });
+
+  it("clears print chrome and can show page numbers", () => {
+    const off = buildManuscriptPrintPageCss(false);
+    expect(off).toContain("@top-center { content: none; }");
+    expect(off).toContain("@bottom-left { content: none; }");
+    expect(off).toContain("content: none;");
+
+    const on = buildManuscriptPrintPageCss(true);
+    expect(on).toContain("content: counter(page);");
   });
 });

@@ -5,11 +5,15 @@ import { useEffect, useState, type CSSProperties } from "react";
 import {
   MANUSCRIPT_MARGINS,
   MANUSCRIPT_MARGIN_STORAGE_KEY,
+  MANUSCRIPT_PAGE_NUMBERS_STORAGE_KEY,
   applyManuscriptMarginToDocument,
   clearManuscriptMarginFromDocument,
+  clearManuscriptPrintPageStyle,
   normalizeManuscriptMargin,
   readStoredManuscriptMargin,
+  readStoredManuscriptPageNumbers,
   stripHtmlLinks,
+  syncManuscriptPrintPageStyle,
   type ManuscriptMargin,
 } from "@/features/workspace/manuscript-print";
 
@@ -28,21 +32,54 @@ export function ManuscriptPreview({
 }: ManuscriptPreviewProps) {
   const isScript = kind === "script";
   const [margin, setMargin] = useState<ManuscriptMargin>("normal");
+  const [pageNumbers, setPageNumbers] = useState(false);
 
   useEffect(() => {
-    const stored = readStoredManuscriptMargin();
-    setMargin(stored);
-    applyManuscriptMarginToDocument(stored);
-    return () => clearManuscriptMarginFromDocument();
+    const storedMargin = readStoredManuscriptMargin();
+    const storedNumbers = readStoredManuscriptPageNumbers();
+    setMargin(storedMargin);
+    setPageNumbers(storedNumbers);
+    applyManuscriptMarginToDocument(storedMargin);
+    syncManuscriptPrintPageStyle(storedNumbers);
+    return () => {
+      clearManuscriptMarginFromDocument();
+      clearManuscriptPrintPageStyle();
+    };
   }, []);
 
   useEffect(() => {
     applyManuscriptMarginToDocument(margin);
   }, [margin]);
 
+  useEffect(() => {
+    syncManuscriptPrintPageStyle(pageNumbers);
+  }, [pageNumbers]);
+
   function chooseMargin(next: ManuscriptMargin) {
     setMargin(next);
     localStorage.setItem(MANUSCRIPT_MARGIN_STORAGE_KEY, next);
+  }
+
+  function togglePageNumbers() {
+    setPageNumbers((current) => {
+      const next = !current;
+      localStorage.setItem(
+        MANUSCRIPT_PAGE_NUMBERS_STORAGE_KEY,
+        next ? "on" : "off",
+      );
+      return next;
+    });
+  }
+
+  function printManuscript() {
+    const previousTitle = document.title;
+    document.title = projectTitle.trim() || " ";
+    const restore = () => {
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
+    window.print();
   }
 
   const marginValue = MANUSCRIPT_MARGINS[margin].inches;
@@ -74,7 +111,20 @@ export function ManuscriptPreview({
             ),
           )}
         </div>
-        <button type="button" onClick={() => window.print()}>
+        <button
+          type="button"
+          className={
+            pageNumbers
+              ? "manuscript-margin-button active"
+              : "manuscript-margin-button"
+          }
+          aria-pressed={pageNumbers}
+          title="Show page numbers centered at the bottom of each printed page"
+          onClick={togglePageNumbers}
+        >
+          Page numbers
+        </button>
+        <button type="button" onClick={printManuscript}>
           <Printer size={15} />
           Print / Save as PDF
         </button>

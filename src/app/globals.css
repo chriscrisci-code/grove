@@ -5212,6 +5212,8 @@ body.dragging-chapter-event .editor-toolbar {
     border-bottom: 0 !important;
   }
   @page {
+    /* Margin boxes are injected by syncManuscriptPrintPageStyle to clear
+       browser date/title/URL chrome; keep fallback margin here. */
     margin: var(--manuscript-margin, 1in);
   }
 }

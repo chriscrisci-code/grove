@@ -1926,10 +1926,10 @@ body.dragging-chapter-event .editor-toolbar {
   min-height: 420px;
   outline: 0;
   color: #1f2420;
-  /* Body weight: was 500 + font-synthesis: none (Courier New often ignored 500). */
-  font: 600 16.5px/1.4 "Courier New", Courier, ui-monospace, monospace;
+  /* Halfway weight: 500 with synthesis (600 was too heavy; 500+none looked like regular). */
+  font: 500 16.5px/1.4 "Courier New", Courier, ui-monospace, monospace;
 }
-.script-editor p { margin: 0 0 .85em; font-weight: 600; }
+.script-editor p { margin: 0 0 .85em; font-weight: 500; }
 .script-editor p[data-script="scene"] {
   margin-top: 1.4em;
   font-weight: 700;
@@ -1944,7 +1944,7 @@ body.dragging-chapter-event .editor-toolbar {
 .script-editor p[data-script="parenthetical"] {
   margin: 0 24% .15em 28%;
   color: #3f463f;
-  font-weight: 600;
+  font-weight: 500;
 }
 .script-editor p[data-script="dialogue"] {
   margin: 0 16% .95em 20%;
@@ -2830,10 +2830,10 @@ body.dragging-chapter-event .editor-toolbar {
 }
 .script-body {
   color: #1f2420;
-  /* Match editor body weight — was 500 + font-synthesis: none. */
-  font: 600 13.5px/1.4 "Courier New", Courier, ui-monospace, monospace;
+  /* Match editor halfway weight — 500 with synthesis allowed. */
+  font: 500 13.5px/1.4 "Courier New", Courier, ui-monospace, monospace;
 }
-.script-body p { margin: 0 0 .85em; font-weight: 600; }
+.script-body p { margin: 0 0 .85em; font-weight: 500; }
 .script-body p[data-script="scene"] {
   margin-top: 1.3em;
   font-weight: 700;

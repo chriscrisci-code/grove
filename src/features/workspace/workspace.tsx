@@ -836,9 +836,23 @@ export function Workspace({
         denyPlan("extraPages");
         return null;
       }
+      let resolvedParentId: string | null = isSidebarListType(pageType)
+        ? null
+        : parentId;
+      if (resolvedParentId) {
+        const parent = pages.find(
+          (candidate) => candidate.id === resolvedParentId,
+        );
+        if (
+          parent?.pageType === "event" ||
+          parent?.pageType === "script_event"
+        ) {
+          resolvedParentId = null;
+        }
+      }
       const page: StoryPage = {
         id: makeId(),
-        parentId: isSidebarListType(pageType) ? null : parentId,
+        parentId: resolvedParentId,
         title,
         content: "<p></p>",
         pageType,
@@ -848,11 +862,13 @@ export function Workspace({
       };
       setPages((current) => {
         let next = [...current, page];
-        if (parentId && pageType === "event") {
-          const parent = next.find((candidate) => candidate.id === parentId);
+        if (resolvedParentId && pageType === "event") {
+          const parent = next.find(
+            (candidate) => candidate.id === resolvedParentId,
+          );
           if (parent?.pageType === "chapter") {
             next = next.map((candidate) =>
-              candidate.id === parentId
+              candidate.id === resolvedParentId
                 ? {
                     ...candidate,
                     content: insertChapterEventMarker(
@@ -865,11 +881,13 @@ export function Workspace({
             );
           }
         }
-        if (parentId && pageType === "script_event") {
-          const parent = next.find((candidate) => candidate.id === parentId);
+        if (resolvedParentId && pageType === "script_event") {
+          const parent = next.find(
+            (candidate) => candidate.id === resolvedParentId,
+          );
           if (parent?.pageType === "script") {
             next = next.map((candidate) =>
-              candidate.id === parentId
+              candidate.id === resolvedParentId
                 ? {
                     ...candidate,
                     content: insertScriptEventMarker(
@@ -884,26 +902,33 @@ export function Workspace({
         }
         return next;
       });
-      if (pageType === "chapter" || (parentId && pageType === "event")) {
+      if (pageType === "chapter" || (resolvedParentId && pageType === "event")) {
         setChaptersOpen(true);
       }
-      if (pageType === "script" || (parentId && pageType === "script_event")) {
+      if (
+        pageType === "script" ||
+        (resolvedParentId && pageType === "script_event")
+      ) {
         setScriptsOpen(true);
       }
-      if (parentId) {
-        setExpanded((current) => new Set(current).add(parentId));
+      if (resolvedParentId) {
+        setExpanded((current) => new Set(current).add(resolvedParentId));
       }
       if (activate) setActiveId(page.id);
       if (
-        parentId &&
-        ((pageType === "event" && parentId === activeId && !activate) ||
-          (pageType === "script_event" && parentId === activeId && !activate))
+        resolvedParentId &&
+        ((pageType === "event" &&
+          resolvedParentId === activeId &&
+          !activate) ||
+          (pageType === "script_event" &&
+            resolvedParentId === activeId &&
+            !activate))
       ) {
         setEditorNonce((current) => current + 1);
       }
       return page;
     },
-    [activeId, blockReadOnly, denyPlan, pages.length, planAccess, readOnly],
+    [activeId, blockReadOnly, denyPlan, pages, planAccess, readOnly],
   );
 
   const movePage = useCallback(
@@ -3579,14 +3604,16 @@ function PageBranch({
                 <ListIndentDecrease size={14} />
               </button>
             )}
-            <button
-              type="button"
-              className="row-add"
-              aria-label={`Add page under ${page.title}`}
-              onClick={() => onAdd(page.id)}
-            >
-              <Plus size={14} />
-            </button>
+            {page.pageType !== "event" && page.pageType !== "script_event" && (
+              <button
+                type="button"
+                className="row-add"
+                aria-label={`Add page under ${page.title}`}
+                onClick={() => onAdd(page.id)}
+              >
+                <Plus size={14} />
+              </button>
+            )}
             <button
               type="button"
               className="row-delete"

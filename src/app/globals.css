@@ -2794,8 +2794,10 @@ body.dragging-chapter-event .editor-toolbar {
   color: #425548;
 }
 .manuscript {
+  /* Match letter page width so on-screen margins match @page print margins. */
   --manuscript-margin: 1in;
-  width: min(720px, calc(100% - 48px));
+  width: 8.5in;
+  max-width: calc(100% - 48px);
   margin: 20px auto 80px;
   padding: var(--manuscript-margin);
   box-sizing: border-box;

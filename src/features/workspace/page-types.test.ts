@@ -96,6 +96,24 @@ describe("page types and chapter order", () => {
     expect(next.find((page) => page.id === "mara")?.parentId).toBe("notes");
   });
 
+  it("unnests children when a page becomes an event or script event", () => {
+    const withChildren = [
+      { id: "storm", parentId: null, pageType: "page" as const },
+      { id: "child", parentId: "storm", pageType: "page" as const },
+    ];
+    const asEvent = applyPageTypeChange(withChildren, "storm", "event");
+    expect(asEvent.find((page) => page.id === "child")?.parentId).toBeNull();
+
+    const asScriptEvent = applyPageTypeChange(
+      withChildren,
+      "storm",
+      "script_event",
+    );
+    expect(
+      asScriptEvent.find((page) => page.id === "child")?.parentId,
+    ).toBeNull();
+  });
+
   it("keeps a script in its own list, not nested in Your story", () => {
     const next = applyPageTypeChange(pages, "mara", "script");
     expect(next.find((page) => page.id === "mara")?.pageType).toBe("script");

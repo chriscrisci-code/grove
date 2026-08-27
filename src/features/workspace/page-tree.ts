@@ -115,6 +115,10 @@ export function applyPageDrop<T extends TreePage>(
     if (!target || draggedId === drop.targetId) return null;
     if (isDescendantOf(pages, draggedId, drop.targetId)) return null;
     if (dragged.parentId === target.id) return null;
+    // Events and script events are leaves — nothing nests under them.
+    if (target.pageType === "event" || target.pageType === "script_event") {
+      return null;
+    }
     if (target.pageType === "script") {
       if (dragged.pageType !== "script_event") return null;
     } else if (target.pageType === "chapter" && dragged.pageType !== "event") {
@@ -174,6 +178,7 @@ export function applyPageTypeChange<
   T extends { id: string; parentId: string | null; pageType: string },
 >(pages: T[], pageId: string, pageType: string): T[] {
   const enteringList = pageType === "chapter" || pageType === "script";
+  const becomingLeaf = pageType === "event" || pageType === "script_event";
   return pages.map((page) => {
     if (page.id === pageId) {
       const leavingOrEnteringList =
@@ -185,6 +190,9 @@ export function applyPageTypeChange<
         pageType,
         parentId: leavingOrEnteringList ? null : page.parentId,
       };
+    }
+    if (becomingLeaf && page.parentId === pageId) {
+      return { ...page, parentId: null };
     }
     if (enteringList && page.parentId === pageId) {
       if (pageType === "chapter" && page.pageType === "event") return page;

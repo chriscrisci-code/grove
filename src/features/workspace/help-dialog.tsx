@@ -60,7 +60,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["Type"],
-        text: "Set a page to Script, Script event, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events nest under a Chapter; Script events nest under a Script. Scripts live in the Scripts list, like Chapters.",
+        text: "Set a page to Script, Script event, Event, Character, Location, Animal, Transport, or Unique object. Typed bible pages keep Also known as. Events nest under a Chapter; Script events nest under a Script. Nothing nests under an Event or Script event. Scripts live in the Scripts list, like Chapters.",
       },
       {
         keys: ["Chapters"],
@@ -127,7 +127,7 @@ const SECTIONS = [
     items: [
       {
         keys: ["+"],
-        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. The plus beside Chapters or Scripts adds to that list. The plus on a Chapter row nests an Event; the plus on a Script row nests a Script event. Pages list A to Z, with subpages under their parent. Drag onto a title to nest. Nested pages have an un-nest control, and you can also drag onto Your story. Filter by page type.",
+        text: "The plus beside Your story creates a top-level page; the plus on a row creates a subpage. The plus beside Chapters or Scripts adds to that list. The plus on a Chapter row nests an Event; the plus on a Script row nests a Script event. Events and Script events cannot hold nested pages. Pages list A to Z, with subpages under their parent. Drag onto a title to nest. Nested pages have an un-nest control, and you can also drag onto Your story. Filter by page type.",
       },
       {
         keys: ["Research"],

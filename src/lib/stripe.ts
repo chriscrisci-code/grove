@@ -10,6 +10,11 @@ export function isStripeConfigured() {
   );
 }
 
+/** One-time donations only need a secret key (inline price_data). */
+export function isStripeDonateConfigured() {
+  return Boolean(process.env.STRIPE_SECRET_KEY);
+}
+
 export function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) {

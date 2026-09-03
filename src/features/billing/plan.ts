@@ -1,6 +1,12 @@
 /** Used by the local demo and tests. Live requests read billing from Supabase. */
 export const UNLOCK_PAID_FOR_TESTING = false;
 
+/**
+ * When true, every account gets full feature access. Plus subscription CTAs
+ * stay dormant; optional donations support Grove development instead.
+ */
+export const PAY_TIERS_SUSPENDED = true;
+
 export const FREE_LIMITS = {
   projects: 1,
   pagesPerProject: 50,
@@ -37,6 +43,7 @@ export function getPlanAccess(options?: {
   unlockPaid?: boolean;
 }): PlanAccess {
   const isPaid =
+    PAY_TIERS_SUSPENDED ||
     (options?.unlockPaid ?? UNLOCK_PAID_FOR_TESTING) ||
     Boolean(options?.subscribed);
   const features = {} as Record<FeatureName, boolean>;
@@ -53,6 +60,9 @@ export function getPlanAccess(options?: {
 }
 
 export function planAccessFromBilling(effectivePlan: "free" | "plus") {
+  if (PAY_TIERS_SUSPENDED) {
+    return getPlanAccess({ unlockPaid: true, subscribed: false });
+  }
   return getPlanAccess({
     unlockPaid: false,
     subscribed: effectivePlan === "plus",
@@ -81,6 +91,9 @@ export function canCreatePage(
 }
 
 export function planLimitMessage(feature: FeatureName) {
+  if (PAY_TIERS_SUSPENDED) {
+    return "Grove is free for everyone right now. If something looks locked, refresh and try again.";
+  }
   switch (feature) {
     case "extraProjects":
       return "Free Grove includes 1 story. Grove Plus unlocks more.";

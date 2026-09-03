@@ -21,7 +21,7 @@ export function GroveJsonLd() {
           "@type": "Offer",
           price: "0",
           priceCurrency: "USD",
-          description: "Grove Free includes one story. Sign up with no credit card.",
+          description: "Grove is free for everyone. Sign up with no credit card.",
         },
       },
     ],

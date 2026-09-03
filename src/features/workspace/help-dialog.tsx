@@ -143,7 +143,7 @@ const SECTIONS = [
       },
       {
         keys: ["Share"],
-        text: "Grove Plus owners can create a private 14-day invite link for a Reviewer or Editor. Reviewers cannot change story text.",
+        text: "Create a private 14-day invite link for a Reviewer or Editor. Reviewers cannot change story text.",
       },
       {
         keys: ["Alt+A"],
@@ -158,8 +158,8 @@ const SECTIONS = [
         text: "Project owners can delete a project from its cover. Grove asks for confirmation because every page, tag, relationship, and research item is permanently removed.",
       },
       {
-        keys: ["Paid"],
-        text: "Free includes 1 story and 50 pages. Grove Plus unlocks more stories, unlimited pages, collaboration, Ask AI, Research, and chapter PDF. Subscribe from Account & billing.",
+        keys: ["Support"],
+        text: "Grove is free for everyone right now. Optional one-time donations on the Support page help fund development. Account & billing shows your free access.",
       },
     ],
   },

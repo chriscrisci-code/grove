@@ -1,5 +1,11 @@
 export const CHANGELOG = [
   {
+    date: "September 2, 2026",
+    items: [
+      "Grove is free for everyone while pay tiers are suspended. Optional one-time donations on Support help fund development.",
+    ],
+  },
+  {
     date: "August 26, 2026",
     items: [
       "Script event is a new page type that nests under Scripts the way Events nest under Chapters, with movable blocks in the script and expansion in the screenplay PDF.",

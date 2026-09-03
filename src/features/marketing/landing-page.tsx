@@ -149,16 +149,19 @@ export function LandingPage() {
         </section>
 
         <section className="marketing-final-cta">
-          <span className="eyebrow">START WITH GROVE FREE</span>
+          <span className="eyebrow">FREE FOR EVERYONE</span>
           <h2>Sign up and start writing.</h2>
-          <p>Grove Free includes one story and fifty pages. No credit card required.</p>
+          <p>
+            Every Grove feature is free. No credit card required. Optional
+            donations support development.
+          </p>
           <div className="marketing-cta-row">
             <Link href="/sign-up" className="marketing-primary-cta">
               Start writing
               <ArrowRight size={17} />
             </Link>
             <Link href="/pricing" className="marketing-secondary-cta">
-              See pricing
+              Support Grove
             </Link>
           </div>
         </section>

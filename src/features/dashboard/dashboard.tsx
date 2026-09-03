@@ -21,6 +21,7 @@ import { FormEvent, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   canUseFeature,
+  PAY_TIERS_SUSPENDED,
   planLimitMessage,
 } from "@/features/billing/plan";
 import {
@@ -66,9 +67,9 @@ export function Dashboard({
     null,
   );
   const [switching, setSwitching] = useState(false);
-  const isPlus = billing.effectivePlan === "plus";
+  const isPlus = PAY_TIERS_SUSPENDED || billing.effectivePlan === "plus";
   const ownedProjects = projects.filter((project) => project.canDelete);
-  const canCreateNew = isPlus || ownedProjects.length === 0;
+  const canCreateNew = true;
   const switchAllowed =
     isPlus ||
     canSwitchActiveStory(
@@ -261,12 +262,10 @@ export function Dashboard({
           <button
             type="button"
             className="dashboard-create"
-            onClick={() =>
-              canCreateNew ? requestNewProject() : router.push("/pricing")
-            }
+            onClick={() => requestNewProject()}
           >
             <Plus size={17} />
-            {canCreateNew ? "New project" : "Grove Plus"}
+            New project
           </button>
         </div>
 
@@ -315,13 +314,7 @@ export function Dashboard({
                 <strong>Start another story</strong>
                 <span>Create a fresh writing project</span>
               </button>
-            ) : (
-              <Link href="/pricing" className="project-add-card">
-                <Plus size={24} />
-                <strong>More stories with Plus</strong>
-                <span>Compare Grove plans</span>
-              </Link>
-            )}
+            ) : null}
           </div>
         ) : (
           <div className="dashboard-empty">

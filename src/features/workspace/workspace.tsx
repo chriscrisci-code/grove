@@ -4174,13 +4174,11 @@ function SettingsDialog({
           </section>
           <section className="settings-section">
             <div>
-              <h3>Grove Plus</h3>
+              <h3>Account</h3>
               <p>
-                Free includes 1 story and 50 pages. Plus unlocks more stories,
-                unlimited pages, Ask AI, Research, review, and chapter PDF.
-                {isPaid
-                  ? " Grove Plus is on for this account."
-                  : " Account & billing is where you subscribe or manage the plan."}
+                Grove is free for everyone right now. Optional donations on
+                Support help fund development.
+                {isPaid ? " Every feature is available on this account." : ""}
               </p>
             </div>
             <Link

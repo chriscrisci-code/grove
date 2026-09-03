@@ -35,7 +35,7 @@ export function FeaturesPage() {
         </section>
 
         <section className="marketing-final-cta pricing-bottom-cta">
-          <span className="eyebrow">START WITH GROVE FREE</span>
+          <span className="eyebrow">FREE FOR EVERYONE</span>
           <h2>Sign up and start writing.</h2>
           <div className="marketing-cta-row">
             <Link href="/sign-up" className="marketing-primary-cta">
@@ -43,7 +43,7 @@ export function FeaturesPage() {
               <ArrowRight size={17} />
             </Link>
             <Link href="/pricing" className="marketing-secondary-cta">
-              See pricing
+              Support Grove
             </Link>
           </div>
         </section>

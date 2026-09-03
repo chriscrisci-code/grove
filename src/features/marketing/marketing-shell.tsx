@@ -15,7 +15,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           </Link>
           <nav aria-label="Main navigation">
             <Link href="/features">Features</Link>
-            <Link href="/pricing">Pricing</Link>
+            <Link href="/pricing">Support</Link>
             <Link href="/sign-in">Sign in</Link>
             <Link href="/sign-up" className="marketing-nav-cta">
               Sign up
@@ -34,7 +34,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
         <p>A connected writing space for stories, worlds, and scripts.</p>
         <nav aria-label="Footer navigation">
           <Link href="/features">Features</Link>
-          <Link href="/pricing">Pricing</Link>
+          <Link href="/pricing">Support</Link>
           <Link href="/sign-in">Sign in</Link>
           <Link href="/demo">Try the demo</Link>
         </nav>

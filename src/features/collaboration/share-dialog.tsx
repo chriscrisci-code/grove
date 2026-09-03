@@ -13,6 +13,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeBillingState } from "@/features/billing/billing-state";
+import { PAY_TIERS_SUSPENDED } from "@/features/billing/plan";
 import {
   collaboratorRoleLabel,
   isInviteEmail,
@@ -80,7 +81,8 @@ export function ShareDialog({
     setMembers((memberResult.data ?? []) as Collaborator[]);
     setInvites((inviteResult.data ?? []) as PendingInvite[]);
     setCanInvite(
-      normalizeBillingState(billingResult.data).effectivePlan === "plus",
+      PAY_TIERS_SUSPENDED ||
+        normalizeBillingState(billingResult.data).effectivePlan === "plus",
     );
   }, [workspaceId]);
 
@@ -105,7 +107,8 @@ export function ShareDialog({
       setMembers((memberResult.data ?? []) as Collaborator[]);
       setInvites((inviteResult.data ?? []) as PendingInvite[]);
       setCanInvite(
-        normalizeBillingState(billingResult.data).effectivePlan === "plus",
+        PAY_TIERS_SUSPENDED ||
+          normalizeBillingState(billingResult.data).effectivePlan === "plus",
       );
     });
     return () => {
@@ -130,7 +133,11 @@ export function ShareDialog({
       return;
     }
     if (!canInvite) {
-      setMessage("Sharing with collaborators requires Grove Plus.");
+      setMessage(
+        PAY_TIERS_SUSPENDED
+          ? "Sharing could not be started. Try again in a moment."
+          : "Sharing with collaborators requires Grove Plus.",
+      );
       return;
     }
     setWorking("invite");
@@ -252,14 +259,14 @@ export function ShareDialog({
         </header>
 
         <div className="share-dialog-body">
-          {!canInvite && (
+          {!canInvite && !PAY_TIERS_SUSPENDED && (
             <div className="created-invite-link">
               <p>
                 Grove Plus is required to invite a Reviewer or Editor. Existing
                 collaborators keep access.
               </p>
               <Link href="/pricing" className="primary-button">
-                Compare plans
+                Support Grove
               </Link>
             </div>
           )}

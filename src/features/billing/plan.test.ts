@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  PAY_TIERS_SUSPENDED,
   canCreatePage,
   canCreateProject,
   canUseFeature,
@@ -19,7 +20,14 @@ describe("plan access", () => {
     expect(canUseFeature("chapterPdf", access)).toBe(true);
   });
 
-  it("keeps free writing tools on a free plan", () => {
+  it("keeps free writing tools on a free plan when tiers are active", () => {
+    if (PAY_TIERS_SUSPENDED) {
+      const access = getPlanAccess({ unlockPaid: false, subscribed: false });
+      expect(access.isPaid).toBe(true);
+      expect(canCreateProject(8, access)).toBe(true);
+      expect(canUseFeature("aiAsk", access)).toBe(true);
+      return;
+    }
     const access = getPlanAccess({ unlockPaid: false, subscribed: false });
     expect(access.limits).toEqual({ projects: 1, pagesPerProject: 50 });
     expect(canCreateProject(0, access)).toBe(true);
@@ -44,13 +52,19 @@ describe("plan access", () => {
     expect(canCreatePage(200, access)).toBe(true);
   });
 
-  it("keeps paid features locked unless the account is Plus", () => {
-    expect(getPlanAccess().isPaid).toBe(false);
-    expect(planAccessFromBilling("free").isPaid).toBe(false);
+  it("unlocks everyone while pay tiers are suspended", () => {
+    expect(PAY_TIERS_SUSPENDED).toBe(true);
+    expect(getPlanAccess().isPaid).toBe(true);
+    expect(planAccessFromBilling("free").isPaid).toBe(true);
     expect(planAccessFromBilling("plus").isPaid).toBe(true);
+    expect(canUseFeature("collaboration", getPlanAccess())).toBe(true);
   });
 
-  it("explains the free story limit", () => {
+  it("explains limits without pushing Plus while suspended", () => {
+    if (PAY_TIERS_SUSPENDED) {
+      expect(planLimitMessage("extraProjects")).toContain("free for everyone");
+      return;
+    }
     expect(planLimitMessage("extraProjects")).toContain("1 story");
     expect(planLimitMessage("extraPages")).toContain("50 pages");
   });

@@ -7,6 +7,12 @@ export const UNLOCK_PAID_FOR_TESTING = false;
  */
 export const PAY_TIERS_SUSPENDED = true;
 
+/**
+ * Ask AI is built but hidden from the product surface for now.
+ * Set true to restore the toolbar, shortcut, and settings connection UI.
+ */
+export const ASK_AI_VISIBLE = false;
+
 export const FREE_LIMITS = {
   projects: 1,
   pagesPerProject: 50,

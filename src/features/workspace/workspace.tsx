@@ -74,6 +74,7 @@ import { HelpDialog } from "@/features/workspace/help-dialog";
 import { NightToggle } from "@/features/workspace/night-toggle";
 import { CHANGELOG } from "@/features/workspace/changelog";
 import {
+  ASK_AI_VISIBLE,
   canCreatePage,
   canUseFeature,
   getPlanAccess,
@@ -171,7 +172,7 @@ const initialPages: StoryPage[] = [
     parentId: null,
     title: "Welcome to Grove",
     content:
-      "<p>Your story begins here. Grove keeps every character, place, and idea within reach.</p><h2>Try a quick link</h2><p>Type a name like <strong>Evermere</strong>, place your cursor after it, and press <strong>Alt+P</strong>. A linked child page will appear instantly.</p><p>Press <strong>Alt+A</strong> whenever you want to think alongside AI.</p>",
+      "<p>Your story begins here. Grove keeps every character, place, and idea within reach.</p><h2>Try a quick link</h2><p>Type a name like <strong>Evermere</strong>, place your cursor after it, and press <strong>Alt+P</strong>. A linked child page will appear instantly.</p>",
     unvisited: false,
     pageType: "page",
     fields: {},
@@ -712,6 +713,7 @@ export function Workspace({
 
   const openAi = useCallback(
     (selectedText = "") => {
+      if (!ASK_AI_VISIBLE) return;
       if (!canUseFeature("aiAsk", planAccess)) {
         denyPlan("aiAsk");
         return;
@@ -725,6 +727,7 @@ export function Workspace({
   );
 
   useEffect(() => {
+    if (!ASK_AI_VISIBLE) return;
     function onAskShortcut(event: KeyboardEvent) {
       if (
         event.altKey &&
@@ -2804,7 +2807,10 @@ export function Workspace({
                 <span>{relationshipsOpen ? "Writing" : "Relationships"}</span>
               </button>
             )}
-            {!writeShell && !researchOpen && !relationshipsOpen && (
+            {ASK_AI_VISIBLE &&
+              !writeShell &&
+              !researchOpen &&
+              !relationshipsOpen && (
               <button
                 type="button"
                 className="ai-button"
@@ -3259,7 +3265,7 @@ export function Workspace({
         )}
       </section>
 
-      {aiOpen && (
+      {ASK_AI_VISIBLE && aiOpen && (
         <AiPanel
           provider={provider}
           model={model}
@@ -4128,7 +4134,7 @@ function SettingsDialog({
                 aria-selected={pane === "connection"}
                 onClick={() => setPane("connection")}
               >
-                Connection
+                {ASK_AI_VISIBLE ? "Connection" : "Account"}
               </button>
               <button
                 type="button"
@@ -4223,6 +4229,7 @@ function SettingsDialog({
               </button>
             </section>
           )}
+          {ASK_AI_VISIBLE && (
           <section className="settings-section">
             <div>
               <h3>AI connection</h3>
@@ -4276,10 +4283,11 @@ function SettingsDialog({
               : "Your key stays in memory and disappears when the tab closes."}
           </p>
           </section>
+          )}
             </>
           )}
         </div>
-        {pane === "connection" && (
+        {pane === "connection" && ASK_AI_VISIBLE && (
         <footer>
           <button type="button" className="secondary-button" onClick={onClose}>
             Cancel

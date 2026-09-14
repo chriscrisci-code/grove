@@ -18,6 +18,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ASK_AI_VISIBLE } from "@/features/billing/plan";
 import { findPageTitleMatches } from "@/features/editor/find-page-links";
 import {
   mergeDictationTranscript,
@@ -731,6 +732,7 @@ export function ScriptEditor({
       if (writeShell) return false;
 
       if (event.key.toLowerCase() === "a") {
+        if (!ASK_AI_VISIBLE) return false;
         event.preventDefault();
         const { from, to } = editor.state.selection;
         onOpenAi(editor.state.doc.textBetween(from, to, " "));

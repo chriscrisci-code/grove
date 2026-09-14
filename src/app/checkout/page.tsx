@@ -98,7 +98,7 @@ export default async function CheckoutPage({
               <Check size={15} /> Unlimited stories and pages
             </li>
             <li>
-              <Check size={15} /> Research and Ask AI
+              <Check size={15} /> Research and collaboration
             </li>
             <li>
               <Check size={15} /> Chapter and script PDF export

@@ -89,7 +89,7 @@ export default async function CheckoutSuccessPage({
         </h1>
         <p>
           {plusReady
-            ? "Unlimited stories, research, review, Ask AI, and manuscript export are on this account."
+            ? "Unlimited stories, research, review, and manuscript export are on this account."
             : paymentsReady
               ? "If you completed payment, Grove Plus will appear on this account in a few seconds. You can also refresh Account & billing."
               : "The test payment may still have gone through in Stripe. Add the Stripe keys to this deployed site, then open Account & billing."}

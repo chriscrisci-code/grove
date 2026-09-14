@@ -19,6 +19,7 @@ import {
   Tag,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ASK_AI_VISIBLE } from "@/features/billing/plan";
 import {
   ChapterEvent,
   ChapterEventContext,
@@ -509,6 +510,7 @@ export function StoryEditor({
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
 
       if (event.key.toLowerCase() === "a") {
+        if (!ASK_AI_VISIBLE) return;
         event.preventDefault();
         const { from, to } = editor.state.selection;
         onOpenAi(editor.state.doc.textBetween(from, to, " "));

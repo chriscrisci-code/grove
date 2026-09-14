@@ -12,7 +12,6 @@ const FREE_FEATURES = [
   "Timeline, relationship web, and family tree",
   "Research workspace",
   "Invite reviewers or editors",
-  "Ask AI with your own provider key",
   "Chapter and script PDF export",
   "Project covers and night colors",
 ];
@@ -116,8 +115,8 @@ export function PricingPage({
               <summary>Is Grove free right now?</summary>
               <p>
                 Yes. During open beta every signed-in account can use the full
-                writing space—unlimited stories, research, collaboration, Ask
-                AI, and PDF export.
+                writing space—unlimited stories, research, collaboration, and
+                PDF export.
               </p>
             </details>
             <details>
@@ -146,13 +145,6 @@ export function PricingPage({
                 comment, and suggest wording. Editors can also write. Grove
                 keeps one person editing at a time so two drafts cannot
                 overwrite each other.
-              </p>
-            </details>
-            <details>
-              <summary>Does Ask AI include AI usage fees?</summary>
-              <p>
-                Grove currently connects to your own OpenAI, Anthropic, or
-                Google key, so provider usage is billed by that provider.
               </p>
             </details>
           </div>

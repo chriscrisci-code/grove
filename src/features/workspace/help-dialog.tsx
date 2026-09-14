@@ -146,12 +146,12 @@ const SECTIONS = [
         text: "Create a private 14-day invite link for a Reviewer or Editor. Reviewers cannot change story text.",
       },
       {
-        keys: ["Alt+A"],
-        text: "Ask AI about the current selection. Dictate turns speech into text and stays on through pauses of up to 30 seconds.",
+        keys: ["Dictate"],
+        text: "Dictate turns speech into text and stays on through pauses of up to 30 seconds.",
       },
       {
         keys: ["Settings"],
-        text: "Connect an AI key, set a sign-in password, choose night colors for low light, and open the Changelog for everything shipped so far.",
+        text: "Set a sign-in password, choose night colors for low light, and open the Changelog for everything shipped so far.",
       },
       {
         keys: ["Dashboard"],

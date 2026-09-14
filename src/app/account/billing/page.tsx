@@ -62,7 +62,7 @@ export default async function BillingPage() {
               </strong>
               <small>
                 {betaForever
-                  ? "Unlimited stories, research, collaboration, Ask AI, and PDF export."
+                  ? "Unlimited stories, research, collaboration, and PDF export."
                   : subscribed
                     ? "Every story is editable"
                     : "Active Free Story limits apply"}

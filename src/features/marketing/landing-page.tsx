@@ -17,7 +17,6 @@ import {
   Printer,
   Search,
   Settings,
-  Sparkles,
   Tags,
 } from "lucide-react";
 import Link from "next/link";
@@ -116,21 +115,6 @@ export function LandingPage() {
           <p className="marketing-features-more">
             <Link href="/features">Read the full list of Grove features</Link>
           </p>
-        </section>
-
-        <section className="marketing-ai-note">
-          <span>
-            <Sparkles size={21} />
-          </span>
-          <div>
-            <p className="eyebrow">OPTIONAL AI, YOUR CHOICE</p>
-            <h2>Think alongside AI without handing it the whole experience.</h2>
-            <p>
-              Ask questions about selected text when you want help. Grove
-              connects to your own OpenAI, Anthropic, or Google key, and stays
-              a writing tool first.
-            </p>
-          </div>
         </section>
 
         <section className="marketing-audience">

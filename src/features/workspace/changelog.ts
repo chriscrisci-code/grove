@@ -3,6 +3,7 @@ export const CHANGELOG = [
     date: "September 14, 2026",
     items: [
       "Open beta: accounts created now are stamped free forever. When paid plans launch for new signups later, beta members keep full access. Optional donations still support development.",
+      "Ask AI is hidden from the product for now. The writing tools stay front and center.",
     ],
   },
   {

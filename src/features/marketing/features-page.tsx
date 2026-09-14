@@ -35,11 +35,11 @@ export function FeaturesPage() {
         </section>
 
         <section className="marketing-final-cta pricing-bottom-cta">
-          <span className="eyebrow">FREE FOR EVERYONE</span>
-          <h2>Sign up and start writing.</h2>
+          <span className="eyebrow">OPEN BETA</span>
+          <h2>Sign up now. Stay free forever.</h2>
           <div className="marketing-cta-row">
             <Link href="/sign-up" className="marketing-primary-cta">
-              Start writing
+              Join the beta
               <ArrowRight size={17} />
             </Link>
             <Link href="/pricing" className="marketing-secondary-cta">

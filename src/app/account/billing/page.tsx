@@ -33,6 +33,7 @@ export default async function BillingPage() {
   const billing = normalizeBillingState(rawBilling);
   const donationsReady = isStripeDonateConfigured();
   const subscribed = hasLivePlusSubscription(billing.subscriptionStatus);
+  const betaForever = billing.betaForever || PAY_TIERS_SUSPENDED;
 
   return (
     <main className="billing-boundary-main">
@@ -41,11 +42,11 @@ export default async function BillingPage() {
           <CreditCard size={24} />
         </span>
         <span className="eyebrow">ACCOUNT &amp; BILLING</span>
-        <h1>{PAY_TIERS_SUSPENDED ? "Grove is free" : "Your Grove plan"}</h1>
+        <h1>{betaForever ? "Beta · free forever" : "Your Grove plan"}</h1>
         <p>
           Signed in as <strong>{user.email}</strong>.{" "}
-          {PAY_TIERS_SUSPENDED
-            ? "Pay tiers are suspended, so every feature is available on this account."
+          {betaForever
+            ? "You joined during Grove beta, so this account keeps full access forever—even after Grove becomes a paid product."
             : "Manage your plan and which story stays editable on Grove Free."}
         </p>
         <div className="billing-plan-summary">
@@ -53,14 +54,14 @@ export default async function BillingPage() {
             <span className="billing-status-dot" />
             <div>
               <strong>
-                {PAY_TIERS_SUSPENDED
-                  ? "Free for everyone"
+                {betaForever
+                  ? "Beta · free forever"
                   : subscribed
                     ? "Grove Plus"
                     : "Grove Free"}
               </strong>
               <small>
-                {PAY_TIERS_SUSPENDED
+                {betaForever
                   ? "Unlimited stories, research, collaboration, Ask AI, and PDF export."
                   : subscribed
                     ? "Every story is editable"
@@ -72,9 +73,9 @@ export default async function BillingPage() {
         <div className="billing-access-policy">
           <strong>Your writing is never held hostage.</strong>
           <p>
-            You can always read, copy, export, or delete your work. If you want
-            to support Grove development, optional one-time donations are on
-            the Support page.
+            You can always read, copy, export, or delete your work. Optional
+            one-time donations on the Support page help fund development—they
+            are never required to keep writing.
           </p>
         </div>
         <div className="onboarding-actions">

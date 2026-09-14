@@ -92,7 +92,7 @@ export function canCreatePage(
 
 export function planLimitMessage(feature: FeatureName) {
   if (PAY_TIERS_SUSPENDED) {
-    return "Grove is free for everyone right now. If something looks locked, refresh and try again.";
+    return "Grove is in open beta with full access. If something looks locked, refresh and try again.";
   }
   switch (feature) {
     case "extraProjects":

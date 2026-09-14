@@ -4176,8 +4176,9 @@ function SettingsDialog({
             <div>
               <h3>Account</h3>
               <p>
-                Grove is free for everyone right now. Optional donations on
-                Support help fund development.
+                Grove is in open beta. Sign up now and this account stays free
+                forever when paid plans launch. Optional donations on Support
+                help fund development.
                 {isPaid ? " Every feature is available on this account." : ""}
               </p>
             </div>

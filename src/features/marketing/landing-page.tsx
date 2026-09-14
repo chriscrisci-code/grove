@@ -48,7 +48,7 @@ export function LandingPage() {
                 See how Grove works
               </Link>
             </div>
-            <small>Free to start · No credit card · One story</small>
+            <small>Open beta · Free forever if you join now · No credit card</small>
           </div>
           <ProductPreview />
         </section>
@@ -149,15 +149,16 @@ export function LandingPage() {
         </section>
 
         <section className="marketing-final-cta">
-          <span className="eyebrow">FREE FOR EVERYONE</span>
-          <h2>Sign up and start writing.</h2>
+          <span className="eyebrow">OPEN BETA</span>
+          <h2>Sign up now. Stay free forever.</h2>
           <p>
-            Every Grove feature is free. No credit card required. Optional
+            Grove is free during beta. Join now and your account keeps full
+            access for life when Grove becomes a paid product. Optional
             donations support development.
           </p>
           <div className="marketing-cta-row">
             <Link href="/sign-up" className="marketing-primary-cta">
-              Start writing
+              Join the beta
               <ArrowRight size={17} />
             </Link>
             <Link href="/pricing" className="marketing-secondary-cta">

@@ -1,5 +1,11 @@
 export const CHANGELOG = [
   {
+    date: "September 14, 2026",
+    items: [
+      "Open beta: accounts created now are stamped free forever. When paid plans launch for new signups later, beta members keep full access. Optional donations still support development.",
+    ],
+  },
+  {
     date: "September 2, 2026",
     items: [
       "Grove is free for everyone while pay tiers are suspended. Optional one-time donations on Support help fund development.",

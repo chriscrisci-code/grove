@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = {
   title: "Create your account",
   description:
-    "Sign up for Grove. Write chapters, keep a world bible, and draft in script format. No credit card required.",
+    "Join Grove’s open beta. Sign up now for a free-forever account when paid plans launch. No credit card required.",
   alternates: { canonical: "/sign-up" },
 };
 

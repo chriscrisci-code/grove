@@ -19,8 +19,8 @@ export default function DonateSuccessPage() {
           <span className="eyebrow">THANK YOU</span>
           <h1>Your support helps Grove grow.</h1>
           <p>
-            Donations keep development moving. Grove stays free for every
-            writer—go plant another page.
+            Donations keep development moving. Your beta account stays free
+            forever—go plant another page.
           </p>
           <div className="marketing-cta-row" style={{ justifyContent: "center" }}>
             <Link href="/dashboard" className="marketing-primary-cta">

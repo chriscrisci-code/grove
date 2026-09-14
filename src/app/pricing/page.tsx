@@ -5,7 +5,7 @@ import { isStripeDonateConfigured } from "@/lib/stripe";
 export const metadata: Metadata = {
   title: "Support",
   description:
-    "Grove is free for everyone—unlimited stories, research, collaboration, Ask AI, and PDF export. Optional donations support development.",
+    "Grove is free during open beta. Sign up now for a free-forever account when paid plans launch. Optional donations support development.",
   alternates: { canonical: "/pricing" },
 };
 

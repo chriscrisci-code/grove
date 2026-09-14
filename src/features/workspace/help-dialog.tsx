@@ -159,7 +159,7 @@ const SECTIONS = [
       },
       {
         keys: ["Support"],
-        text: "Grove is free for everyone right now. Optional one-time donations on the Support page help fund development. Account & billing shows your free access.",
+        text: "Grove is in open beta—sign up now and your account stays free forever when paid plans launch. Optional one-time donations on the Support page help fund development. Account & billing shows your beta access.",
       },
     ],
   },

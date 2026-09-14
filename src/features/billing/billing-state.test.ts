@@ -23,6 +23,7 @@ describe("billing state", () => {
       subscriptionStatus: "active",
       hasStripeCustomer: true,
       previewMode: false,
+      betaForever: false,
     });
   });
 
@@ -41,6 +42,20 @@ describe("billing state", () => {
     });
   });
 
+  it("normalizes beta forever access", () => {
+    expect(
+      normalizeBillingState({
+        effectivePlan: "plus",
+        previewMode: false,
+        betaForever: true,
+      }),
+    ).toMatchObject({
+      betaForever: true,
+      effectivePlan: "plus",
+      previewMode: false,
+    });
+  });
+
   it("normalizes a free account and its active story", () => {
     expect(
       normalizeBillingState({
@@ -54,6 +69,7 @@ describe("billing state", () => {
       effectivePlan: "free",
       previewMode: false,
       activeWorkspaceId: "story-1",
+      betaForever: false,
     });
   });
 

@@ -26,28 +26,33 @@ export function PricingPage({
     <MarketingShell>
       <main className="pricing-main">
         <section className="pricing-hero">
-          <span className="eyebrow">FREE FOR EVERYONE</span>
-          <h1>Grove is free. Write without a paywall.</h1>
+          <span className="eyebrow">OPEN BETA</span>
+          <h1>Sign up now. Stay free forever.</h1>
           <p>
-            Every feature is available on every account. If Grove helps your
-            stories grow and you want to support development, you can donate
-            below—optional, one time, no subscription.
+            Grove is free during beta—every feature, every story. Accounts
+            created now are part of the beta team and keep full access for
+            life when Grove becomes a paid product. Optional donations support
+            development.
           </p>
         </section>
 
-        <section className="pricing-grid support-grid" aria-label="Grove is free">
+        <section
+          className="pricing-grid support-grid"
+          aria-label="Grove beta and support"
+        >
           <article className="pricing-card featured">
-            <span className="eyebrow">GROVE</span>
-            <h2>Everything included</h2>
+            <span className="eyebrow">BETA ACCESS</span>
+            <h2>Free forever if you join now</h2>
             <p className="pricing-price">
               <strong>$0</strong>
-              <span>for everyone</span>
+              <span>for beta accounts</span>
             </p>
             <p className="pricing-description">
-              No story limits, no locked tools, no credit card to start.
+              No credit card. Full writing space today. Grandfathered free
+              access when paid plans launch for new signups later.
             </p>
             <Link href="/sign-up" className="marketing-primary-cta">
-              Start writing free
+              Join the beta
               <ArrowRight size={16} />
             </Link>
             <ul>
@@ -67,13 +72,21 @@ export function PricingPage({
             </div>
             <h2>Help keep development going</h2>
             <p className="pricing-description">
-              Donations are optional and one-time. Grove stays free either way.
+              Donations are optional and one-time. Your beta account stays free
+              either way.
             </p>
             <DonateForm donationsReady={donationsReady} />
           </article>
         </section>
 
         <section className="pricing-assurance">
+          <article>
+            <h3>Beta means free forever for you.</h3>
+            <p>
+              Sign up during beta and Grove stamps your account. When paid
+              plans open for new writers later, your access stays unlocked.
+            </p>
+          </article>
           <article>
             <h3>Your writing remains yours.</h3>
             <p>
@@ -82,17 +95,10 @@ export function PricingPage({
             </p>
           </article>
           <article>
-            <h3>AI stays optional.</h3>
-            <p>
-              Grove connects to an AI provider key you control. The editor,
-              story organization, and relationships work without it.
-            </p>
-          </article>
-          <article>
             <h3>Support is not a subscription.</h3>
             <p>
               A donation thanks the work behind Grove. It does not unlock
-              features—those are already free.
+              features—beta accounts already have everything.
             </p>
           </article>
         </section>
@@ -107,11 +113,19 @@ export function PricingPage({
           </div>
           <div>
             <details>
-              <summary>Is Grove really free?</summary>
+              <summary>Is Grove free right now?</summary>
               <p>
-                Yes. Pay tiers are suspended. Every signed-in account can use
-                the full writing space, including unlimited stories, research,
-                collaboration, Ask AI, and PDF export.
+                Yes. During open beta every signed-in account can use the full
+                writing space—unlimited stories, research, collaboration, Ask
+                AI, and PDF export.
+              </p>
+            </details>
+            <details>
+              <summary>What does “free forever” mean?</summary>
+              <p>
+                If you create an account during beta, Grove marks you as a beta
+                member. When Grove later charges new signups, your account
+                keeps full access at no cost.
               </p>
             </details>
             <details>
@@ -146,9 +160,9 @@ export function PricingPage({
 
         <section className="marketing-final-cta pricing-bottom-cta">
           <span className="eyebrow">NO CARD REQUIRED</span>
-          <h2>Start with the story already asking to be written.</h2>
+          <h2>Join the beta while it is open.</h2>
           <Link href="/sign-up" className="marketing-primary-cta">
-            Start writing
+            Start writing free
             <ArrowRight size={17} />
           </Link>
         </section>

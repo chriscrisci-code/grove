@@ -62,7 +62,7 @@ describe("plan access", () => {
 
   it("explains limits without pushing Plus while suspended", () => {
     if (PAY_TIERS_SUSPENDED) {
-      expect(planLimitMessage("extraProjects")).toContain("free for everyone");
+      expect(planLimitMessage("extraProjects")).toContain("open beta");
       return;
     }
     expect(planLimitMessage("extraProjects")).toContain("1 story");

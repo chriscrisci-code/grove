@@ -5,4 +5,4 @@ export const SITE_URL = (
 export const SITE_NAME = "Grove";
 
 export const SITE_DESCRIPTION =
-  "Grove is a connected writing space for novelists and worldbuilders. Write chapters, keep a world bible, and draft in a dedicated script format. Free for everyone.";
+  "Grove is a connected writing space for novelists and worldbuilders. Write chapters, keep a world bible, and draft in a dedicated script format. Free during beta—sign up now and keep full access forever.";

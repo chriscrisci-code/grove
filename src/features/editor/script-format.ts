@@ -127,6 +127,32 @@ export function applyCharacterToolbarBlocks(
   return [...next, "dialogue"];
 }
 
+/**
+ * Scripts for soft-break visual lines after a toolbar press.
+ * Only the focused line changes; Char also marks the following visual line as Talk.
+ * When Char is on the last line, returns needsEmptyDialogue so the editor can
+ * reuse the next sibling paragraph or insert an empty Talk line.
+ */
+export function applyToolbarToVisualLines(
+  lineCount: number,
+  lineIndex: number,
+  sharedScript: ScriptElement,
+  element: ScriptElement,
+): { scripts: ScriptElement[]; needsEmptyDialogue: boolean } {
+  const safeCount = Math.max(1, lineCount);
+  const safeIndex = Math.max(0, Math.min(lineIndex, safeCount - 1));
+  const scripts = Array.from({ length: safeCount }, () => sharedScript);
+  scripts[safeIndex] = element;
+  if (element !== "character") {
+    return { scripts, needsEmptyDialogue: false };
+  }
+  if (safeIndex + 1 < safeCount) {
+    scripts[safeIndex + 1] = "dialogue";
+    return { scripts, needsEmptyDialogue: false };
+  }
+  return { scripts, needsEmptyDialogue: true };
+}
+
 export function nextElementOnEnter(current: ScriptElement): ScriptElement {
   switch (current) {
     case "scene":

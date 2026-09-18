@@ -3,6 +3,7 @@ import {
   applyCharacterToolbarBlocks,
   applyScriptSlash,
   applySluglineTime,
+  applyToolbarToVisualLines,
   bestCharacterAutofill,
   collectCharacterNamesFromHtml,
   cycleSluglinePrefix,
@@ -45,6 +46,25 @@ describe("script element flow", () => {
       "character",
       "dialogue",
     ]);
+  });
+
+  it("splits soft-break visual lines so Char only hits the focused line", () => {
+    expect(applyToolbarToVisualLines(2, 0, "action", "character")).toEqual({
+      scripts: ["character", "dialogue"],
+      needsEmptyDialogue: false,
+    });
+    expect(applyToolbarToVisualLines(3, 1, "action", "character")).toEqual({
+      scripts: ["action", "character", "dialogue"],
+      needsEmptyDialogue: false,
+    });
+    expect(applyToolbarToVisualLines(2, 1, "action", "character")).toEqual({
+      scripts: ["action", "character"],
+      needsEmptyDialogue: true,
+    });
+    expect(applyToolbarToVisualLines(2, 0, "action", "scene")).toEqual({
+      scripts: ["scene", "action"],
+      needsEmptyDialogue: false,
+    });
   });
 });
 

@@ -5,6 +5,7 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { Fragment, type Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import {
   Clapperboard,
@@ -36,6 +37,7 @@ import {
   SCRIPT_ELEMENT_LABELS,
   SCRIPT_ELEMENT_TITLES,
   applyScriptSlash,
+  applyToolbarToVisualLines,
   bestCharacterAutofill,
   collectCharacterNamesFromHtml,
   cycleSluglinePrefix,
@@ -109,11 +111,7 @@ const StoryLink = Link.extend({
 
 function paragraphContext($from: {
   depth: number;
-  node: (depth: number) => {
-    type: { name: string };
-    attrs: Record<string, unknown>;
-    nodeSize: number;
-  };
+  node: (depth: number) => ProseMirrorNode;
   before: (depth: number) => number;
 }) {
   for (let depth = $from.depth; depth > 0; depth -= 1) {
@@ -165,7 +163,42 @@ function replaceCurrentBlock(
     .run();
 }
 
-/** Format only the current paragraph; Char also marks/creates the next as Talk. */
+/** Split a paragraph's content into visual lines at hardBreak (Shift+Enter / paste). */
+function visualLineFragments(node: ProseMirrorNode): Fragment[] {
+  const lines: Fragment[] = [];
+  let parts: ProseMirrorNode[] = [];
+  node.forEach((child) => {
+    if (child.type.name === "hardBreak") {
+      lines.push(Fragment.from(parts));
+      parts = [];
+      return;
+    }
+    parts.push(child);
+  });
+  lines.push(Fragment.from(parts));
+  return lines.length > 0 ? lines : [Fragment.empty];
+}
+
+type VisualLineRange = { start: number; end: number };
+
+function visualLineRanges(node: ProseMirrorNode): VisualLineRange[] {
+  const ranges: VisualLineRange[] = [];
+  let start = 0;
+  let walked = 0;
+  node.forEach((child) => {
+    if (child.type.name === "hardBreak") {
+      ranges.push({ start, end: walked });
+      walked += child.nodeSize;
+      start = walked;
+      return;
+    }
+    walked += child.nodeSize;
+  });
+  ranges.push({ start, end: walked });
+  return ranges;
+}
+
+/** Format only the current visual line; Char also marks/creates the next as Talk. */
 function setCurrentElement(editor: Editor, element: ScriptElement) {
   return editor
     .chain()
@@ -175,34 +208,76 @@ function setCurrentElement(editor: Editor, element: ScriptElement) {
       if (!found) return false;
       if (!dispatch) return true;
 
-      tr.setNodeMarkup(found.pos, undefined, {
-        ...found.node.attrs,
-        script: element,
-      });
+      const contentOffset = Math.max(
+        0,
+        Math.min(
+          state.selection.from - (found.pos + 1),
+          found.node.content.size,
+        ),
+      );
+      const lineFragments = visualLineFragments(found.node);
+      const ranges = visualLineRanges(found.node);
+      let lineIndex = ranges.findIndex(
+        (range) => contentOffset >= range.start && contentOffset <= range.end,
+      );
+      if (lineIndex < 0) lineIndex = Math.max(0, ranges.length - 1);
 
-      if (element === "character") {
-        const after = found.pos + found.node.nodeSize;
-        const next = tr.doc.nodeAt(after);
-        if (next?.type.name === "paragraph") {
-          tr.setNodeMarkup(after, undefined, {
-            ...next.attrs,
-            script: "dialogue",
-          });
+      const shared = normalizeScriptElement(found.node.attrs.script);
+      const { scripts, needsEmptyDialogue } = applyToolbarToVisualLines(
+        lineFragments.length,
+        lineIndex,
+        shared,
+        element,
+      );
+
+      const paragraphs = scripts.map((script, i) =>
+        state.schema.nodes.paragraph.create(
+          { ...found.node.attrs, script },
+          lineFragments[i] ?? Fragment.empty,
+        ),
+      );
+
+      if (needsEmptyDialogue) {
+        const afterReplace = found.pos + found.node.nodeSize;
+        const nextSibling = tr.doc.nodeAt(afterReplace);
+        if (nextSibling?.type.name === "paragraph") {
+          tr.replaceWith(found.pos, afterReplace, paragraphs);
+          const dialoguePos =
+            found.pos +
+            paragraphs.reduce((sum, node) => sum + node.nodeSize, 0);
+          const next = tr.doc.nodeAt(dialoguePos);
+          if (next?.type.name === "paragraph") {
+            tr.setNodeMarkup(dialoguePos, undefined, {
+              ...next.attrs,
+              script: "dialogue",
+            });
+          }
         } else {
-          const para = state.schema.nodes.paragraph.create({
-            script: "dialogue",
-          });
-          tr.insert(after, para);
+          paragraphs.push(
+            state.schema.nodes.paragraph.create({ script: "dialogue" }),
+          );
+          tr.replaceWith(
+            found.pos,
+            found.pos + found.node.nodeSize,
+            paragraphs,
+          );
         }
+      } else {
+        tr.replaceWith(found.pos, found.pos + found.node.nodeSize, paragraphs);
       }
 
-      const caret = Math.min(
-        state.selection.from,
-        found.pos + found.node.nodeSize - 1,
+      const lineStart = ranges[lineIndex]?.start ?? 0;
+      const lineSize = paragraphs[lineIndex]!.content.size;
+      const offsetInLine = Math.max(
+        0,
+        Math.min(contentOffset - lineStart, lineSize),
       );
-      tr.setSelection(
-        TextSelection.near(tr.doc.resolve(Math.max(found.pos + 1, caret))),
-      );
+      let caretPos = found.pos + 1;
+      for (let i = 0; i < lineIndex; i += 1) {
+        caretPos += paragraphs[i]!.nodeSize;
+      }
+      caretPos += offsetInLine;
+      tr.setSelection(TextSelection.near(tr.doc.resolve(caretPos)));
       return true;
     })
     .run();

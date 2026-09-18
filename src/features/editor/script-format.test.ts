@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyCharacterToolbarBlocks,
   applyScriptSlash,
   applySluglineTime,
   bestCharacterAutofill,
@@ -28,6 +29,22 @@ describe("script element flow", () => {
     expect(nextElementOnTab("action")).toBe("character");
     expect(nextElementOnTab("dialogue")).toBe("character");
     expect(nextElementOnTab("character")).toBe("parenthetical");
+  });
+
+  it("formats only the current line as Char and the next as Talk", () => {
+    expect(
+      applyCharacterToolbarBlocks(
+        ["action", "action", "action"],
+        1,
+      ),
+    ).toEqual(["action", "character", "dialogue"]);
+  });
+
+  it("creates a Talk line after Char when none follows", () => {
+    expect(applyCharacterToolbarBlocks(["action"], 0)).toEqual([
+      "character",
+      "dialogue",
+    ]);
   });
 });
 

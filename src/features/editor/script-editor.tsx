@@ -107,6 +107,24 @@ const StoryLink = Link.extend({
   inclusive: false,
 });
 
+function paragraphContext($from: {
+  depth: number;
+  node: (depth: number) => {
+    type: { name: string };
+    attrs: Record<string, unknown>;
+    nodeSize: number;
+  };
+  before: (depth: number) => number;
+}) {
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth);
+    if (node.type.name === "paragraph") {
+      return { depth, pos: $from.before(depth), node };
+    }
+  }
+  return null;
+}
+
 function currentElement(editor: Editor): ScriptElement {
   return normalizeScriptElement(editor.getAttributes("paragraph").script);
 }
@@ -125,30 +143,68 @@ function replaceCurrentBlock(
   const { $from } = editor.state.selection;
   const from = $from.start();
   const to = $from.end();
+  const found = paragraphContext($from);
   return editor
     .chain()
     .focus()
-    .updateAttributes("paragraph", { script: element })
     .command(({ tr, dispatch }) => {
-      if (dispatch) {
-        tr.insertText(text, from, to);
-        const anchor = from + Math.max(0, Math.min(caret, text.length));
-        const head =
-          selectTo === undefined
-            ? anchor
-            : from + Math.max(0, Math.min(selectTo, text.length));
-        tr.setSelection(TextSelection.create(tr.doc, anchor, head));
-      }
+      if (!found || !dispatch) return Boolean(found);
+      tr.setNodeMarkup(found.pos, undefined, {
+        ...found.node.attrs,
+        script: element,
+      });
+      tr.insertText(text, from, to);
+      const anchor = from + Math.max(0, Math.min(caret, text.length));
+      const head =
+        selectTo === undefined
+          ? anchor
+          : from + Math.max(0, Math.min(selectTo, text.length));
+      tr.setSelection(TextSelection.create(tr.doc, anchor, head));
       return true;
     })
     .run();
 }
 
+/** Format only the current paragraph; Char also marks/creates the next as Talk. */
 function setCurrentElement(editor: Editor, element: ScriptElement) {
   return editor
     .chain()
     .focus()
-    .updateAttributes("paragraph", { script: element })
+    .command(({ tr, state, dispatch }) => {
+      const found = paragraphContext(state.selection.$from);
+      if (!found) return false;
+      if (!dispatch) return true;
+
+      tr.setNodeMarkup(found.pos, undefined, {
+        ...found.node.attrs,
+        script: element,
+      });
+
+      if (element === "character") {
+        const after = found.pos + found.node.nodeSize;
+        const next = tr.doc.nodeAt(after);
+        if (next?.type.name === "paragraph") {
+          tr.setNodeMarkup(after, undefined, {
+            ...next.attrs,
+            script: "dialogue",
+          });
+        } else {
+          const para = state.schema.nodes.paragraph.create({
+            script: "dialogue",
+          });
+          tr.insert(after, para);
+        }
+      }
+
+      const caret = Math.min(
+        state.selection.from,
+        found.pos + found.node.nodeSize - 1,
+      );
+      tr.setSelection(
+        TextSelection.near(tr.doc.resolve(Math.max(found.pos + 1, caret))),
+      );
+      return true;
+    })
     .run();
 }
 
@@ -157,7 +213,16 @@ function splitToElement(editor: Editor, element: ScriptElement) {
     .chain()
     .focus()
     .splitBlock()
-    .updateAttributes("paragraph", { script: element })
+    .command(({ tr, dispatch }) => {
+      if (!dispatch) return true;
+      const found = paragraphContext(tr.selection.$from);
+      if (!found) return false;
+      tr.setNodeMarkup(found.pos, undefined, {
+        ...found.node.attrs,
+        script: element,
+      });
+      return true;
+    })
     .run();
 }
 
@@ -202,14 +267,18 @@ function applyInlineCharacterAutofill(
   return editor
     .chain()
     .focus()
-    .updateAttributes("paragraph", { script: "character" })
     .command(({ tr, dispatch }) => {
-      if (dispatch) {
-        tr.insertText(cue, blockStart, blockEnd);
-        const selectFrom = blockStart + typedLen;
-        const selectTo = blockStart + cue.length;
-        tr.setSelection(TextSelection.create(tr.doc, selectFrom, selectTo));
-      }
+      if (!dispatch) return true;
+      const found = paragraphContext(tr.selection.$from);
+      if (!found) return false;
+      tr.setNodeMarkup(found.pos, undefined, {
+        ...found.node.attrs,
+        script: "character",
+      });
+      tr.insertText(cue, blockStart, blockEnd);
+      const selectFrom = blockStart + typedLen;
+      const selectTo = blockStart + cue.length;
+      tr.setSelection(TextSelection.create(tr.doc, selectFrom, selectTo));
       return true;
     })
     .run();

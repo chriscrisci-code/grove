@@ -111,6 +111,22 @@ export function normalizeScriptElement(value: unknown): ScriptElement {
   return typeof value === "string" && isScriptElement(value) ? value : "action";
 }
 
+/** Model of toolbar Char: current line becomes character; next becomes dialogue. */
+export function applyCharacterToolbarBlocks(
+  scripts: ScriptElement[],
+  index: number,
+): ScriptElement[] {
+  if (index < 0 || index >= scripts.length) return scripts;
+  const next = scripts.map((script, i) =>
+    i === index ? ("character" as const) : script,
+  );
+  if (index + 1 < next.length) {
+    next[index + 1] = "dialogue";
+    return next;
+  }
+  return [...next, "dialogue"];
+}
+
 export function nextElementOnEnter(current: ScriptElement): ScriptElement {
   switch (current) {
     case "scene":

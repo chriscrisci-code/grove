@@ -827,11 +827,7 @@ export function ScriptEditor({
           return true;
         }
         const next = nextElementOnTab(kind);
-        if (currentBlockText(editor).trim()) {
-          splitToElement(editor, next);
-        } else {
-          setCurrentElement(editor, next);
-        }
+        setCurrentElement(editor, next);
         if (next === "character") {
           setPickerOpen(true);
           setPickerIndex(0);
@@ -900,11 +896,7 @@ export function ScriptEditor({
       if (event.key.toLowerCase() === "c") {
         event.preventDefault();
         setStarted(true);
-        if (currentBlockText(editor).trim()) {
-          splitToElement(editor, "character");
-        } else {
-          setCurrentElement(editor, "character");
-        }
+        setCurrentElement(editor, "character");
         setPickerOpen(true);
         setPickerIndex(0);
         return true;
